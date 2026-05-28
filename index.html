@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BidTrivia – Test your Kellogg course bidding knowledge. Place courses on the timeline by their closing bid cost in points.">
+  <title>BidTrivia – Kellogg Bidding Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ═══════════════ START SCREEN ═══════════════ -->
+  <div id="start-screen" class="screen active">
+    <div class="stars" aria-hidden="true">
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+    </div>
+    <div class="start-content">
+      <div class="start-logo">
+        <div class="logo-icon">📚</div>
+        <h1>BidTrivia</h1>
+        <p class="tagline">How well do you know the Kellogg bid market?</p>
+      </div>
+
+      <div class="how-to-play">
+        <h2>How to Play</h2>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">You'll see a course card — name, term, professor, phase, bids, and seats — but the <strong>closing cost is hidden</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Place it on the <strong>cost timeline</strong> where you think it belongs relative to already-placed cards.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Get it right to grow your streak. <strong>Three wrong placements</strong> and game over!</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="start-btn" class="btn-primary" onclick="startGame()">
+        <span>Start Game</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ GAME SCREEN ═══════════════ -->
+  <div id="game-screen" class="screen">
+
+    <header class="game-header">
+      <div class="header-brand">
+        <span>📚</span>
+        <span class="brand-name">BidTrivia</span>
+      </div>
+      <div class="header-center">
+        <div id="progress-text" class="progress-text-header"></div>
+      </div>
+      <div class="header-right">
+        <div id="lives-display" class="lives-display"></div>
+        <div class="stat-pill">
+          <span class="stat-label">🔥</span>
+          <span id="streak-display" class="stat-value">0</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Score</span>
+          <span id="score-display" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="game-main">
+
+      <!-- Active Card Area -->
+      <section class="active-section">
+        <p class="section-prompt">Where does this belong on the <strong>cost timeline</strong>?</p>
+
+        <div id="active-card-wrap">
+          <div id="active-card" class="card card--active" draggable="true">
+            <div class="card-course-name" id="active-course"></div>
+            <div class="card-professor" id="active-professor"></div>
+            <div class="card-campus" id="active-campus"></div>
+            <div class="card-term-phase" id="active-term-phase"></div>
+            <div class="card-stats">
+              <div class="card-stat">
+                <span class="card-stat-label">Bids</span>
+                <span class="card-stat-value" id="active-bids"></span>
+              </div>
+              <div class="card-stat">
+                <span class="card-stat-label">Seats</span>
+                <span class="card-stat-value" id="active-seats"></span>
+              </div>
+              <div class="card-stat cost-hidden">
+                <span class="card-stat-label">Cost</span>
+                <span class="card-stat-value">???</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="drag-hint" id="drag-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0M14 10V4a2 2 0 00-2-2v0a2 2 0 00-2 2v0M10 10.5V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0v8l-1-1c-.9-.9-2.4-.9-3.3 0v0c-.9.9-.9 2.4 0 3.3L5 20c1.5 1.5 3.5 2 6 2h2a5 5 0 005-5V11a2 2 0 00-2-2v0a2 2 0 00-2 2v0"/></svg>
+          Drag to a slot · or tap a slot below
+        </p>
+      </section>
+
+      <!-- Timeline -->
+      <section class="timeline-section">
+        <div class="timeline-axis-label">
+          <span>← Cheaper</span>
+          <span class="axis-title">Closing Cost (points)</span>
+          <span>More Expensive →</span>
+        </div>
+        <div class="timeline-scroll-wrap" id="timeline-scroll-wrap">
+          <div id="timeline" class="timeline"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════ GAME OVER SCREEN ═══════════════ -->
+  <div id="gameover-screen" class="screen">
+    <div class="gameover-content">
+      <div id="gameover-emoji" class="gameover-emoji">💀</div>
+      <h1 id="gameover-title" class="gameover-title">Game Over</h1>
+      <p id="gameover-sub" class="gameover-sub"></p>
+
+      <div class="final-score-ring">
+        <svg viewBox="0 0 120 120" class="ring-svg">
+          <circle cx="60" cy="60" r="52" class="ring-bg"/>
+          <circle cx="60" cy="60" r="52" class="ring-fill" id="ring-fill"/>
+        </svg>
+        <div class="ring-inner">
+          <div id="final-score" class="ring-number">0</div>
+          <div class="ring-label">correct</div>
+        </div>
+      </div>
+
+      <div class="gameover-stats">
+        <div class="go-stat"><span class="go-stat-val" id="final-streak">0</span><span class="go-stat-label">Best Streak</span></div>
+        <div class="go-stat"><span class="go-stat-val" id="final-accuracy">0%</span><span class="go-stat-label">Accuracy</span></div>
+        <div class="go-stat"><span class="go-stat-val" id="final-cards">0</span><span class="go-stat-label">Cards Seen</span></div>
+      </div>
+
+      <div class="gameover-actions">
+        <button class="btn-primary" onclick="startGame()">Play Again</button>
+        <button class="btn-secondary" onclick="goHome()">Home</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <script src="data/kellogg_bid_stats.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
