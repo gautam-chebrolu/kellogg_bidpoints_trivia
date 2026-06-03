@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BidTrivia Tournament Leaderboard – Live scores for all teams.">
+  <title>BidTrivia Leaderboard – Live</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+
+  <!-- Load Firebase config from gitignored file (see firebase-config.example.js) -->
+  <script src="firebase-config.js"></script>
+
+  <!-- Firebase v10 -->
+  <script type="module">
+    import { initializeApp }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore,
+             collection, onSnapshot,
+             query, orderBy }           from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    /* Config is loaded from firebase-config.js (gitignored).
+       See firebase-config.example.js for setup instructions. */
+    if (!window.FIREBASE_CONFIG) {
+      throw new Error('firebase-config.js not found. Copy firebase-config.example.js → firebase-config.js and fill in your values.');
+    }
+
+    const app = initializeApp(window.FIREBASE_CONFIG);
+    const db  = getFirestore(app);
+
+    // Listen for real-time updates to the bidtrivia collection
+    const q = query(collection(db, 'bidtrivia'), orderBy('startedAt', 'asc'));
+    onSnapshot(q, (snapshot) => {
+      const docs = [];
+      snapshot.forEach(d => docs.push({ id: d.id, ...d.data() }));
+      window.dispatchEvent(new CustomEvent('scores-updated', { detail: docs }));
+    }, (err) => {
+      console.error('Firestore error:', err);
+      document.getElementById('connection-status').textContent = '⚠️ Connection error';
+      document.getElementById('connection-status').className   = 'status-pill error';
+    });
+
+    // Signal that Firebase is connected
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('connection-status').textContent = '🟢 Live';
+      document.getElementById('connection-status').className   = 'status-pill live';
+    });
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0d0f14;
+      --surface:    #161922;
+      --surface2:   #1e2330;
+      --border:     rgba(255,255,255,0.08);
+      --text:       #f0f4ff;
+      --muted:      #8b9ab8;
+      --gold:       #f6c90e;
+      --silver:     #b0b8cc;
+      --bronze:     #cd7f32;
+      --blue:       #63b3ed;
+      --green:      #68d391;
+      --red:        #fc8181;
+      --yellow:     #fbd38d;
+      --radius:     16px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ───────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 20%, rgba(99,179,237,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 60% at 80% 80%, rgba(246,201,14,0.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ───────────────────────────────────────────── */
+    .page { position: relative; z-index: 1; min-height: 100vh; padding: 32px 24px 60px; max-width: 900px; margin: 0 auto; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    .lb-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .lb-title-block { display: flex; align-items: center; gap: 16px; }
+    .lb-icon {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #4299e1, #2b6cb0);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem;
+      box-shadow: 0 8px 24px rgba(66,153,225,0.3);
+    }
+    .lb-title { font-family: 'Newsreader', serif; font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 700; color: var(--text); }
+    .lb-subtitle { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .status-pill.live  { border-color: rgba(104,211,145,0.35); color: var(--green); }
+    .status-pill.error { border-color: rgba(252,129,129,0.35); color: var(--red);   }
+
+    .last-updated { color: var(--muted); font-size: 0.75rem; }
+
+    /* ── Summary cards ────────────────────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      text-align: center;
+    }
+    .summary-num   { font-size: 2rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .summary-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* ── Section header ───────────────────────────────────── */
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title { font-size: 0.8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .col-headers {
+      display: grid;
+      grid-template-columns: 40px 1fr 80px 80px 80px 80px 70px;
+      gap: 8px;
+      padding: 0 20px;
+      margin-bottom: 8px;
+    }
+    .col-head { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .col-head.right { text-align: right; }
+
+    /* ── Row ──────────────────────────────────────────────── */
+    #leaderboard-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .lb-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 80px 80px 80px 80px 70px;
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: rowIn 0.4s cubic-bezier(.22,.68,0,1.1) both;
+    }
+    @keyframes rowIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+    .lb-row:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+
+    /* Rank highlights */
+    .lb-row.rank-1 { border-color: rgba(246,201,14,0.35);  background: linear-gradient(135deg, rgba(246,201,14,0.06), var(--surface)); }
+    .lb-row.rank-2 { border-color: rgba(176,184,204,0.35); background: linear-gradient(135deg, rgba(176,184,204,0.05), var(--surface)); }
+    .lb-row.rank-3 { border-color: rgba(205,127,50,0.35);  background: linear-gradient(135deg, rgba(205,127,50,0.05), var(--surface)); }
+    .lb-row.in-progress { border-color: rgba(99,179,237,0.25); }
+
+    /* Rank cell */
+    .rank-cell { display: flex; align-items: center; justify-content: center; }
+    .rank-medal { font-size: 1.3rem; }
+    .rank-num   { font-size: 1rem; font-weight: 700; color: var(--muted); }
+
+    /* Team cell */
+    .team-cell {}
+    .team-name { font-weight: 700; font-size: 0.97rem; color: var(--text); }
+    .team-code { font-size: 0.72rem; color: var(--muted); margin-top: 2px; font-family: monospace; letter-spacing: 0.08em; }
+
+    /* Stat cells */
+    .stat-cell { text-align: right; }
+    .stat-main  { font-size: 1rem; font-weight: 700; }
+    .stat-sub   { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .stat-cell.score-col .stat-main { color: var(--blue); font-size: 1.2rem; }
+    .stat-cell.accuracy-col .stat-main { color: var(--green); }
+    .stat-cell.streak-col .stat-main  { color: var(--yellow); }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      border-radius: 100px; padding: 3px 10px;
+      font-size: 0.7rem; font-weight: 600;
+      white-space: nowrap;
+    }
+    .status-badge.completed  { background: rgba(104,211,145,0.15); color: var(--green);  border: 1px solid rgba(104,211,145,0.3); }
+    .status-badge.started    { background: rgba(99,179,237,0.15);  color: var(--blue);   border: 1px solid rgba(99,179,237,0.3);  }
+
+    /* ── Empty state ──────────────────────────────────────── */
+    #empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--muted);
+    }
+    #empty-state .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+    #empty-state h2 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    #empty-state p  { font-size: 0.88rem; line-height: 1.6; }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .col-headers,
+      .lb-row {
+        grid-template-columns: 36px 1fr 60px 60px 60px 55px;
+      }
+      .lb-row > .time-col,
+      .col-headers > .time-col { display: none; }
+    }
+    @media (max-width: 440px) {
+      .col-headers,
+      .lb-row { grid-template-columns: 32px 1fr 56px 56px 52px; }
+      .lb-row > .streak-col,
+      .col-headers > .streak-col { display: none; }
+    }
+
+    /* ── Pulse dot for live ───────────────────────────────── */
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+    .pulse-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation: pulse 1.6s ease-in-out infinite; display:inline-block; }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="lb-header">
+    <div class="lb-title-block">
+      <div class="lb-icon">📚</div>
+      <div>
+        <div class="lb-title">BidTrivia Leaderboard</div>
+        <div class="lb-subtitle">Tournament — Live Scores</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="connection-status" class="status-pill">⏳ Connecting…</span>
+      <span class="last-updated" id="last-updated"></span>
+    </div>
+  </header>
+
+  <!-- SUMMARY -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="summary-num" id="stat-teams">—</div>
+      <div class="summary-label">Teams Playing</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="stat-finished">—</div>
+      <div class="summary-label">Finished</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="stat-top-score">—</div>
+      <div class="summary-label">Top Score</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" id="stat-avg-score">—</div>
+      <div class="summary-label">Avg Score</div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-head">
+    <span class="section-title">Rankings</span>
+    <span style="font-size:0.72rem;color:var(--muted);">Ranked by score · ties broken by speed</span>
+  </div>
+
+  <div class="col-headers">
+    <div class="col-head">#</div>
+    <div class="col-head">Team</div>
+    <div class="col-head right score-col">Score</div>
+    <div class="col-head right accuracy-col">Accuracy</div>
+    <div class="col-head right streak-col">Streak</div>
+    <div class="col-head right time-col">Time</div>
+    <div class="col-head right">Status</div>
+  </div>
+
+  <div id="leaderboard-list">
+    <div id="empty-state">
+      <div class="empty-icon">🏁</div>
+      <h2>Waiting for teams to start…</h2>
+      <p>Once teams enter their codes and begin playing,<br>their scores will appear here in real time.</p>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+'use strict';
+
+function formatTime(secs) {
+  if (secs == null || isNaN(secs)) return '—';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function rankMedal(rank) {
+  if (rank === 1) return '<span class="rank-medal">🥇</span>';
+  if (rank === 2) return '<span class="rank-medal">🥈</span>';
+  if (rank === 3) return '<span class="rank-medal">🥉</span>';
+  return `<span class="rank-num">${rank}</span>`;
+}
+
+function rankClass(rank) {
+  if (rank === 1) return 'rank-1';
+  if (rank === 2) return 'rank-2';
+  if (rank === 3) return 'rank-3';
+  return '';
+}
+
+function buildRow(entry, rank) {
+  const isComplete = entry.status === 'completed';
+  const score      = entry.score      != null ? entry.score      : '—';
+  const accuracy   = entry.accuracy   != null ? entry.accuracy + '%' : '—';
+  const streak     = entry.bestStreak != null ? entry.bestStreak : '—';
+  const elapsed    = isComplete ? formatTime(entry.elapsedSeconds) : '▶ Playing…';
+  const statusLabel = isComplete ? '✓ Done' : '▶ Playing';
+  const statusClass = isComplete ? 'completed' : 'started';
+
+  const row = document.createElement('div');
+  row.className = `lb-row ${rankClass(rank)} ${isComplete ? '' : 'in-progress'}`;
+  row.style.animationDelay = `${(rank - 1) * 0.05}s`;
+  row.innerHTML = `
+    <div class="rank-cell">${rankMedal(rank)}</div>
+    <div class="team-cell">
+      <div class="team-name">${entry.team || entry.id}</div>
+      <div class="team-code">${entry.id}</div>
+    </div>
+    <div class="stat-cell score-col">
+      <div class="stat-main">${score}</div>
+      <div class="stat-sub">/ 14 cards</div>
+    </div>
+    <div class="stat-cell accuracy-col">
+      <div class="stat-main">${accuracy}</div>
+      <div class="stat-sub">accuracy</div>
+    </div>
+    <div class="stat-cell streak-col">
+      <div class="stat-main">${streak}</div>
+      <div class="stat-sub">best streak</div>
+    </div>
+    <div class="stat-cell time-col">
+      <div class="stat-main" style="font-size:0.88rem;">${elapsed}</div>
+    </div>
+    <div class="stat-cell">
+      <span class="status-badge ${statusClass}">${statusLabel}</span>
+    </div>
+  `;
+  return row;
+}
+
+function sortEntries(docs) {
+  // Completed teams ranked first, by score DESC then elapsed ASC (speed tiebreak)
+  const completed = docs.filter(d => d.status === 'completed')
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.elapsedSeconds ?? Infinity) - (b.elapsedSeconds ?? Infinity);
+    });
+  const inProgress = docs.filter(d => d.status !== 'completed')
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return [...completed, ...inProgress];
+}
+
+window.addEventListener('scores-updated', (e) => {
+  const docs    = e.detail || [];
+  const sorted  = sortEntries(docs);
+  const list    = document.getElementById('leaderboard-list');
+  const empty   = document.getElementById('empty-state');
+
+  // Summary
+  const finished   = docs.filter(d => d.status === 'completed');
+  const topScore   = finished.length ? Math.max(...finished.map(d => d.score ?? 0)) : null;
+  const avgScore   = finished.length
+    ? Math.round(finished.reduce((s, d) => s + (d.score ?? 0), 0) / finished.length)
+    : null;
+
+  document.getElementById('stat-teams').textContent    = docs.length    || '0';
+  document.getElementById('stat-finished').textContent = finished.length || '0';
+  document.getElementById('stat-top-score').textContent = topScore != null ? topScore : '—';
+  document.getElementById('stat-avg-score').textContent = avgScore  != null ? avgScore  : '—';
+
+  // Last updated
+  document.getElementById('last-updated').textContent =
+    'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  // Render rows
+  list.innerHTML = '';
+  if (sorted.length === 0) {
+    list.appendChild(document.getElementById('empty-state') || createEmpty());
+    empty && list.appendChild(empty);
+  } else {
+    empty && empty.remove();
+    sorted.forEach((entry, i) => {
+      list.appendChild(buildRow(entry, i + 1));
+    });
+  }
+});
+
+function createEmpty() {
+  const el = document.createElement('div');
+  el.id = 'empty-state';
+  el.innerHTML = `
+    <div class="empty-icon">🏁</div>
+    <h2>Waiting for teams to start…</h2>
+    <p>Once teams enter their codes and begin playing,<br>their scores will appear here in real time.</p>
+  `;
+  return el;
+}
+</script>
+
+</body>
+</html>

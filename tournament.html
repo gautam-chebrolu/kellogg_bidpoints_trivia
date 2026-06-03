@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="BidTrivia Tournament – Kellogg bidding knowledge competition. Enter your team code to play.">
+  <title>BidTrivia Tournament – Kellogg</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Load Firebase config from gitignored file (see firebase-config.example.js) -->
+  <script src="firebase-config.js"></script>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FIREBASE  (v10 modular — loaded from CDN, no npm needed)
+       ════════════════════════════════════════════════════════ -->
+  <script type="module">
+    import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore,
+             doc, runTransaction, updateDoc,
+             setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    /* Config is loaded from firebase-config.js (gitignored).
+       See firebase-config.example.js for setup instructions. */
+    if (!window.FIREBASE_CONFIG) {
+      throw new Error('firebase-config.js not found. Copy firebase-config.example.js → firebase-config.js and fill in your values.');
+    }
+
+    const app = initializeApp(window.FIREBASE_CONFIG);
+    const db  = getFirestore(app);
+
+    /* Expose Firebase helpers to non-module scripts below */
+    window._db             = db;
+    window._doc            = doc;
+    window._runTransaction = runTransaction;
+    window._updateDoc      = updateDoc;
+    window._setDoc         = setDoc;
+    window._serverTimestamp = serverTimestamp;
+
+    /* Signal that Firebase is ready */
+    document.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
+  <style>
+    /* ── Tournament-specific additions ───────────────────────── */
+
+    /* ── Code Gate Screen ──────────────────────────────────── */
+    #code-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0d0f14;
+      z-index: 1000;
+    }
+    #code-screen.hidden { display: none; }
+
+    .code-gate {
+      width: min(480px, 92vw);
+      background: linear-gradient(145deg, #161922, #1e2330);
+      border: 1px solid rgba(99,179,237,0.18);
+      border-radius: 24px;
+      padding: 48px 40px 40px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.55),
+                  0 0 0 1px rgba(255,255,255,0.04) inset;
+      text-align: center;
+      animation: gateIn 0.55s cubic-bezier(.22,.68,0,1.2) both;
+    }
+    @keyframes gateIn {
+      from { opacity:0; transform: scale(0.88) translateY(20px); }
+      to   { opacity:1; transform: scale(1)    translateY(0);    }
+    }
+
+    .gate-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(99,179,237,0.12);
+      border: 1px solid rgba(99,179,237,0.25);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #63b3ed;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .code-gate h1 {
+      font-family: 'Newsreader', serif;
+      font-size: clamp(1.7rem, 5vw, 2.2rem);
+      font-weight: 600;
+      color: #f0f4ff;
+      margin: 0 0 8px;
+      line-height: 1.2;
+    }
+    .code-gate .subtitle {
+      color: #8b9ab8;
+      font-size: 0.93rem;
+      margin: 0 0 36px;
+      line-height: 1.5;
+    }
+
+    .code-input-wrap {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    /* Shared input styles */
+    .gate-input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      color: #f0f4ff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    .gate-input:focus {
+      border-color: #63b3ed;
+      box-shadow: 0 0 0 3px rgba(99,179,237,0.18);
+    }
+    .gate-input.error  { border-color: #fc8181; box-shadow: 0 0 0 3px rgba(252,129,129,0.18); }
+    .gate-input.success{ border-color: #68d391; box-shadow: 0 0 0 3px rgba(104,211,145,0.18); }
+
+    /* Code input — big monospace */
+    #team-code-input {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-align: center;
+      text-transform: uppercase;
+      padding: 18px 20px;
+    }
+    #team-code-input::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 0.1em; font-size: 1rem; font-weight: 400; }
+
+    /* Team name input — normal text */
+    #team-name-input {
+      font-size: 1rem;
+      font-weight: 500;
+      text-align: center;
+      padding: 14px 20px;
+    }
+    #team-name-input::placeholder { color: rgba(255,255,255,0.25); }
+
+    .input-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #8b9ab8;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      text-align: left;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .code-error {
+      color: #fc8181;
+      font-size: 0.84rem;
+      font-weight: 500;
+      min-height: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    #submit-code-btn {
+      width: 100%;
+      padding: 16px;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #4299e1, #3182ce);
+      color: #fff;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      letter-spacing: 0.03em;
+      box-shadow: 0 4px 20px rgba(66,153,225,0.4);
+    }
+    #submit-code-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    #submit-code-btn:active:not(:disabled) { transform: translateY(0); }
+    #submit-code-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .gate-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,0.12);
+      font-size: 0.75rem;
+      margin: 20px 0 16px;
+    }
+    .gate-divider::before, .gate-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    /* ── Tournament header badge ──────────────────────────── */
+    .team-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99,179,237,0.15);
+      border: 1px solid rgba(99,179,237,0.3);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #63b3ed;
+      white-space: nowrap;
+    }
+
+    /* ── Timer display ────────────────────────────────────── */
+    .stat-pill.timer-pill .stat-label { color: #fbd38d; }
+    .stat-pill.timer-pill .stat-value { color: #fefce8; }
+
+    /* ── Submitting overlay ───────────────────────────────── */
+    #submit-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #submit-overlay.visible { display: flex; }
+    .submit-spinner {
+      width: 52px; height: 52px;
+      border: 4px solid rgba(99,179,237,0.2);
+      border-top-color: #63b3ed;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .submit-label { color: #f0f4ff; font-weight: 600; font-size: 1rem; }
+
+    /* ── Submitted banner on game-over ───────────────────── */
+    .score-submitted-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(104,211,145,0.12);
+      border: 1px solid rgba(104,211,145,0.3);
+      border-radius: 12px;
+      padding: 12px 18px;
+      color: #68d391;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      justify-content: center;
+    }
+
+
+  </style>
+</head>
+<body class="tournament-mode">
+
+  <!-- ══════════════ CODE GATE ══════════════ -->
+  <div id="code-screen">
+    <div class="code-gate">
+      <div class="gate-badge">🏆 Tournament Mode</div>
+      <h1>BidTrivia</h1>
+      <p class="subtitle">
+        Enter your team code and team name to unlock today's game.
+      </p>
+
+      <div class="code-input-wrap">
+        <label class="input-label" for="team-code-input">Your Code</label>
+        <input
+          id="team-code-input"
+          class="gate-input"
+          type="text"
+          maxlength="8"
+          placeholder="e.g. AB12"
+          autocomplete="off"
+          spellcheck="false"
+          autocorrect="off"
+          autocapitalize="characters"
+        >
+      </div>
+
+      <div class="code-input-wrap">
+        <label class="input-label" for="team-name-input">Team Name</label>
+        <input
+          id="team-name-input"
+          class="gate-input"
+          type="text"
+          maxlength="40"
+          placeholder="e.g. The Quant Quizzers"
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </div>
+
+      <p class="code-error" id="code-error-msg"></p>
+
+      <button id="submit-code-btn" onclick="submitCode()">Enter the Game →</button>
+
+      <div class="gate-divider">one-time use • all teams play the same game</div>
+      <p style="color:#8b9ab8;font-size:0.78rem;margin:0;">
+        Your code will be marked used once submitted.<br>
+        Scores are recorded automatically at game end.
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════ SUBMIT OVERLAY ══════════════ -->
+  <div id="submit-overlay">
+    <div class="submit-spinner"></div>
+    <div class="submit-label">Submitting your score…</div>
+  </div>
+
+  <!-- ══════════════ START SCREEN ══════════════ -->
+  <div id="start-screen" class="screen">
+    <div class="stars" aria-hidden="true">
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+      <div class="star"></div><div class="star"></div><div class="star"></div>
+    </div>
+    <div class="start-content">
+      <div class="start-logo">
+        <div class="logo-icon">📚</div>
+        <h1>BidTrivia</h1>
+        <p class="tagline">How well do you know the Kellogg bid market?</p>
+        <div class="team-badge" id="header-team-badge" style="margin-top:10px;">🏆 Tournament</div>
+      </div>
+
+      <div class="how-to-play">
+        <h2>How to Play</h2>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">You'll see a course card — name, term, professor, phase, bids, and seats — but the <strong>closing cost is hidden</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Place it on the <strong>cost timeline</strong> where you think it belongs relative to already-placed cards.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Get it right to grow your streak. <strong>Three wrong placements</strong> and game over!</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="start-btn" class="btn-primary" onclick="startGame()">
+        <span>Start Tournament Game</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════ GAME SCREEN ══════════════ -->
+  <div id="game-screen" class="screen">
+    <header class="game-header">
+      <div class="header-brand">
+        <span>📚</span>
+        <span class="brand-name">BidTrivia</span>
+        <div class="team-badge" id="game-team-badge" style="margin-left:6px;"></div>
+      </div>
+      <div class="header-center">
+        <div id="progress-text" class="progress-text-header"></div>
+      </div>
+      <div class="header-right">
+        <div id="lives-display" class="lives-display"></div>
+        <div class="stat-pill timer-pill">
+          <span class="stat-label">⏱</span>
+          <span id="timer-display" class="stat-value">0:00</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">🔥</span>
+          <span id="streak-display" class="stat-value">0</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Score</span>
+          <span id="score-display" class="stat-value">0</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="game-main">
+      <section class="active-section">
+        <p class="section-prompt">Where does this belong on the <strong>cost timeline</strong>?</p>
+        <div id="active-card-wrap">
+          <div id="active-card" class="card card--active" draggable="true">
+            <div class="card-course-name" id="active-course"></div>
+            <div class="card-professor"   id="active-professor"></div>
+            <div class="card-campus"      id="active-campus"></div>
+            <div class="card-term-phase"  id="active-term-phase"></div>
+            <div class="card-stats">
+              <div class="card-stat">
+                <span class="card-stat-label">Bids</span>
+                <span class="card-stat-value" id="active-bids"></span>
+              </div>
+              <div class="card-stat">
+                <span class="card-stat-label">Seats</span>
+                <span class="card-stat-value" id="active-seats"></span>
+              </div>
+              <div class="card-stat cost-hidden">
+                <span class="card-stat-label">Cost</span>
+                <span class="card-stat-value">???</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="drag-hint" id="drag-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0M14 10V4a2 2 0 00-2-2v0a2 2 0 00-2 2v0M10 10.5V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0v8l-1-1c-.9-.9-2.4-.9-3.3 0v0c-.9.9-.9 2.4 0 3.3L5 20c1.5 1.5 3.5 2 6 2h2a5 5 0 005-5V11a2 2 0 00-2-2v0a2 2 0 00-2 2v0"/></svg>
+          Drag to a slot · or tap a slot below
+        </p>
+      </section>
+
+      <section class="timeline-section">
+        <div class="timeline-axis-label">
+          <span>← Cheaper</span>
+          <span class="axis-title">Closing Cost (points)</span>
+          <span>More Expensive →</span>
+        </div>
+        <div class="timeline-scroll-wrap" id="timeline-scroll-wrap">
+          <div id="timeline" class="timeline"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ══════════════ GAME OVER SCREEN ══════════════ -->
+  <div id="gameover-screen" class="screen">
+    <div class="gameover-content">
+      <div id="gameover-emoji" class="gameover-emoji">💀</div>
+      <h1 id="gameover-title" class="gameover-title">Game Over</h1>
+      <p id="gameover-sub" class="gameover-sub"></p>
+
+      <div id="score-submitted-banner" class="score-submitted-banner" style="display:none;">
+        ✅ Score submitted! Check the leaderboard.
+      </div>
+
+      <div class="final-score-ring">
+        <svg viewBox="0 0 120 120" class="ring-svg">
+          <circle cx="60" cy="60" r="52" class="ring-bg"/>
+          <circle cx="60" cy="60" r="52" class="ring-fill" id="ring-fill"/>
+        </svg>
+        <div class="ring-inner">
+          <div id="final-score" class="ring-number">0</div>
+          <div class="ring-label">correct</div>
+        </div>
+      </div>
+
+      <div class="gameover-stats">
+        <div class="go-stat"><span class="go-stat-val" id="final-streak">0</span><span class="go-stat-label">Best Streak</span></div>
+        <div class="go-stat"><span class="go-stat-val" id="final-accuracy">0%</span><span class="go-stat-label">Accuracy</span></div>
+        <div class="go-stat"><span class="go-stat-val" id="final-cards">0</span><span class="go-stat-label">Cards Seen</span></div>
+        <div class="go-stat"><span class="go-stat-val" id="final-time">0:00</span><span class="go-stat-label">Total Time</span></div>
+      </div>
+
+      <div class="gameover-actions">
+        <button class="btn-secondary" onclick="window.location.href='index.html'">← Back to Games</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <!-- ══════════════ GAME LOGIC ══════════════ -->
+  <script>
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════
+     TOURNAMENT CONFIGURATION
+     ═══════════════════════════════════════════════════════════
+     TOURNAMENT_DECK: 15 pre-selected, pre-ordered cards that
+     every team will play in the same sequence.
+     Sourced from real kellogg_bid_stats.js data (Fall 2023 –
+     Winter 2024, Phase 1, Full-Time program).
+     Costs span 1 → 2449 for good difficulty spread.
+  ═══════════════════════════════════════════════════════════ */
+  const TOURNAMENT_DECK = [
+    // Anchor card (placed automatically, not guessed)
+    { course: "Financial Decisions",          professor: "Artur Raviv",         campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 57,  seats: 49,  cost: 50   },
+    // Cards to place (sorted here only for reference — game uses the ORDER below)
+    { course: "New Venture Discovery",        professor: "Jeffrey Eschbach",     campus: "Chicago",  term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 35,  seats: 35,  cost: 56   },
+    { course: "Business Law",                 professor: "Mark McCareins",       campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 77,  seats: 62,  cost: 150  },
+    { course: "Finance II",                   professor: "Filippo Mezzanotti",   campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 45,  seats: 24,  cost: 353  },
+    { course: "Launching & Scaling Startups", professor: "Carter Cast",          campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 83,  seats: 39,  cost: 2015 },
+    { course: "Finance II (Mezzanotti §32)",  professor: "Filippo Mezzanotti",   campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 41,  seats: 28,  cost: 200  },
+    { course: "Financial Planning for M&A",   professor: "Mark Finn",            campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 1,   seats: 1,   cost: 125  },
+    { course: "Finance II (Ravina §81)",      professor: "Enrichetta Ravina",    campus: "Chicago",  term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 3", bids: 7,   seats: 1,   cost: 600  },
+    { course: "Financial Decisions §31 P2",   professor: "Artur Raviv",          campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 2", bids: 8,   seats: 5,   cost: 263  },
+    { course: "Finance II §32 Bid Phase 3",   professor: "Filippo Mezzanotti",   campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 3", bids: 7,   seats: 1,   cost: 600  },
+    { course: "Finance II §32 PWYB",          professor: "Filippo Mezzanotti",   campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Pay What You Bid", bids: 6, seats: 25, cost: 50 },
+    { course: "Finance II §31 Pay What You Bid", professor: "Filippo Mezzanotti", campus: "Evanston", term: "Fall 2023",  quarter: "Fall",   year: "2023", phase: "Pay What You Bid", bids: 3, seats: 1, cost: 153 },
+    { course: "Entrepreneurship Through Acquisition", professor: "Matt Littell", campus: "Chicago",  term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Pay What You Bid", bids: 4, seats: 20, cost: 1  },
+    { course: "Finance II §32 Bid Phase 2",   professor: "Filippo Mezzanotti",   campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 2", bids: 16, seats: 1,   cost: 2449 },
+    { course: "Launching & Scaling (E&W)",    professor: "Carter Cast",          campus: "Evanston", term: "Fall 2023",   quarter: "Fall",   year: "2023", phase: "Bid Phase 1", bids: 9,  seats: 7,   cost: 1236 },
+  ];
+
+  /* ═══════════════════════════════════════════════════════════
+     CONSTANTS
+  ═══════════════════════════════════════════════════════════ */
+  const LIVES          = 3;
+  const CARDS_PER_GAME = TOURNAMENT_DECK.length - 1; // excluding anchor
+
+  /* ═══════════════════════════════════════════════════════════
+     STATE
+  ═══════════════════════════════════════════════════════════ */
+  let state = {
+    teamCode:    '',
+    teamName:    '',
+    timeline:    [],
+    deck:        [],
+    cardIndex:   0,
+    lives:       LIVES,
+    score:       0,
+    streak:      0,
+    bestStreak:  0,
+    cardsAttempted: 0,
+    isAnimating: false,
+    dragging:    false,
+    clickMode:   false,
+    startedAt:   null,   // Date object
+    timerInterval: null,
+    elapsedSeconds: 0,
+    submitted:   false,
+    firebaseReady: false,
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     FIREBASE READINESS
+  ═══════════════════════════════════════════════════════════ */
+  document.addEventListener('firebase-ready', () => {
+    state.firebaseReady = true;
+  });
+
+  /* ═══════════════════════════════════════════════════════════
+     CODE GATE
+  ═══════════════════════════════════════════════════════════ */
+  const codeInput  = () => document.getElementById('team-code-input');
+  const nameInput  = () => document.getElementById('team-name-input');
+  const codeError  = () => document.getElementById('code-error-msg');
+  const codeScreen = () => document.getElementById('code-screen');
+
+  // Enter key on either input submits
+  document.addEventListener('DOMContentLoaded', () => {
+    codeInput().addEventListener('keydown', (e) => { if (e.key === 'Enter') nameInput().focus(); });
+    nameInput().addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
+  });
+
+  async function submitCode() {
+    const rawCode = codeInput().value.trim().toUpperCase();
+    const rawTeam = nameInput().value.trim();
+    const btn     = document.getElementById('submit-code-btn');
+
+    if (!rawCode) { showCodeError('Please enter your team code.'); return; }
+    if (!rawTeam) { showCodeError('Please enter your team name.'); return; }
+    if (!state.firebaseReady) {
+      showCodeError('Connecting to Firebase… please wait a moment and try again.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    clearCodeError();
+
+    try {
+      const db         = window._db;
+      const codesRef   = window._doc(db, 'tournament', 'codes');
+
+      // Atomically check + claim the code in a transaction
+      await window._runTransaction(db, async (tx) => {
+        const snap = await tx.get(codesRef);
+
+        if (!snap.exists()) {
+          throw Object.assign(new Error(), { code: 'NO_DOC' });
+        }
+
+        const data = snap.data();
+
+        if (!(rawCode in data)) {
+          throw Object.assign(new Error(), { code: 'INVALID' });
+        }
+
+        if (data[rawCode] === true) {
+          throw Object.assign(new Error(), { code: 'USED' });
+        }
+
+        // Claim it — set the field to true
+        tx.update(codesRef, { [rawCode]: true });
+      });
+
+      // Transaction succeeded — write the game start record
+      state.teamCode  = rawCode;
+      state.teamName  = rawTeam;
+      state.startedAt = new Date();
+
+      await window._setDoc(
+        window._doc(db, 'bidtrivia', rawCode),
+        {
+          code:      rawCode,
+          team:      rawTeam,
+          startedAt: window._serverTimestamp(),
+          status:    'started',
+        }
+      );
+
+      // Animate success → show start screen
+      codeInput().classList.add('success');
+      nameInput().classList.add('success');
+      await delay(400);
+      codeScreen().classList.add('hidden');
+      document.getElementById('start-screen').classList.add('active');
+      updateTeamBadges();
+
+    } catch (err) {
+      const c = err.code;
+      if      (c === 'NO_DOC')  showCodeError('Tournament not configured yet. Contact the host.');
+      else if (c === 'INVALID') showCodeError('❌ Invalid code. Double-check with your host.');
+      else if (c === 'USED')    showCodeError('⚠️ That code has already been used. Each code is one-time only.');
+      else if (c === 'permission-denied') showCodeError('❌ Firestore permission denied — check your security rules in the Firebase console.');
+      else if (c === 'unavailable')       showCodeError('❌ Firebase unavailable — check your internet connection.');
+      else { console.error('Firebase error:', err); showCodeError(`Error: ${err.code || err.message || 'unknown'}. Check the browser console for details.`); }
+      resetBtn(btn);
+    }
+  }
+
+  function showCodeError(msg) {
+    codeError().textContent = msg;
+    codeInput().classList.add('error');
+    codeInput().classList.remove('success');
+  }
+  function clearCodeError() {
+    codeError().textContent = '';
+    codeInput().classList.remove('error', 'success');
+    nameInput().classList.remove('error', 'success');
+  }
+  function resetBtn(btn) {
+    btn.disabled = false;
+    btn.textContent = 'Enter the Game →';
+  }
+
+  function updateTeamBadges() {
+    const label = `🏆 ${state.teamName}`;
+    document.getElementById('header-team-badge').textContent = label;
+    document.getElementById('game-team-badge').textContent   = label;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     GAME LOGIC  (adapted from original game.js)
+  ═══════════════════════════════════════════════════════════ */
+  async function startGame() {
+    document.getElementById('start-screen').classList.remove('active');
+    document.getElementById('gameover-screen').classList.remove('active');
+    document.getElementById('game-screen').classList.add('active');
+
+    // Build deck: anchor first, rest follow in TOURNAMENT_DECK order
+    const anchor = TOURNAMENT_DECK[0];
+    const cards  = TOURNAMENT_DECK.slice(1); // exact tournament order
+
+    state.deck           = cards;
+    state.timeline       = [anchor];
+    state.cardIndex      = 0;
+    state.lives          = LIVES;
+    state.score          = 0;
+    state.streak         = 0;
+    state.bestStreak     = 0;
+    state.cardsAttempted = 0;
+    state.isAnimating    = false;
+    state.clickMode      = false;
+    state.submitted      = false;
+    state.elapsedSeconds = 0;
+
+    if (!state.startedAt) state.startedAt = new Date();
+    startTimer();
+
+    renderAll();
+    scrollTimelineToCenter();
+  }
+
+  function goHome() {
+    document.getElementById('gameover-screen').classList.remove('active');
+    document.getElementById('game-screen').classList.remove('active');
+    document.getElementById('start-screen').classList.add('active');
+  }
+
+  function activeCard() {
+    return state.deck[state.cardIndex] || null;
+  }
+
+  function isCorrectPlacement(slotIndex, cost) {
+    const tl = state.timeline;
+    const leftCost  = slotIndex > 0         ? tl[slotIndex - 1].cost : -Infinity;
+    const rightCost = slotIndex < tl.length ? tl[slotIndex].cost     :  Infinity;
+    return leftCost <= cost && cost <= rightCost;
+  }
+
+  function findCorrectSlot(cost) {
+    const tl = state.timeline;
+    for (let i = 0; i <= tl.length; i++) {
+      const left  = i > 0         ? tl[i - 1].cost : -Infinity;
+      const right = i < tl.length ? tl[i].cost     :  Infinity;
+      if (left <= cost && cost <= right) return i;
+    }
+    return tl.length;
+  }
+
+  function insertIntoTimeline(card, slotIndex) {
+    state.timeline.splice(slotIndex, 0, card);
+  }
+
+  async function handlePlacement(slotIndex) {
+    if (state.isAnimating) return;
+    const card = activeCard();
+    if (!card) return;
+
+    state.isAnimating = true;
+    state.cardsAttempted++;
+
+    if (state.clickMode) {
+      state.clickMode = false;
+      document.getElementById('active-card').classList.remove('card--picked');
+    }
+
+    const correct = isCorrectPlacement(slotIndex, card.cost);
+
+    if (correct) {
+      state.score++;
+      state.streak++;
+      if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+      insertIntoTimeline(card, slotIndex);
+      renderTimeline();
+      renderStats();
+      const placed  = document.querySelectorAll('.card--placed');
+      const newCard = placed[slotIndex];
+      if (newCard) newCard.classList.add('card--correct');
+      showToast(streakMessage(state.streak), 'correct');
+      await delay(500);
+      if (newCard) newCard.classList.remove('card--correct');
+      advanceCard();
+    } else {
+      state.lives--;
+      state.streak = 0;
+      renderStats();
+      const ac = document.getElementById('active-card');
+      ac.classList.add('shake');
+      ac.style.animation = 'none';
+      setTimeout(() => { ac.classList.remove('shake'); ac.style.animation = ''; }, 600);
+      const correctSlot = findCorrectSlot(card.cost);
+      insertIntoTimeline(card, correctSlot);
+      renderTimeline();
+      const placed    = document.querySelectorAll('.card--placed');
+      const wrongCard = placed[correctSlot];
+      if (wrongCard) wrongCard.classList.add('card--wrong');
+      showToast(`❌ It cost ${card.cost} pts — placing it correctly`, 'wrong');
+      await delay(1500);
+      if (wrongCard) wrongCard.classList.remove('card--wrong');
+
+      if (state.lives <= 0) {
+        await delay(400);
+        await showGameOver();
+        return;
+      }
+      advanceCard();
+    }
+    state.isAnimating = false;
+  }
+
+  function advanceCard() {
+    state.cardIndex++;
+    if (state.cardIndex >= state.deck.length) {
+      showGameOver(true);
+      return;
+    }
+    renderActiveCard();
+    renderProgress();
+    scrollTimelineToCenter();
+  }
+
+  function streakMessage(streak) {
+    if (streak >= 10) return `🔥 ${streak} streak!! Unreal!`;
+    if (streak >= 7)  return `🔥 ${streak} in a row! On fire!`;
+    if (streak >= 5)  return `🔥 ${streak} in a row!`;
+    if (streak >= 3)  return `✅ ${streak} streak!`;
+    return '✅ Correct!';
+  }
+
+  async function showGameOver(won = false) {
+    stopTimer();
+    document.getElementById('game-screen').classList.remove('active');
+    const screen = document.getElementById('gameover-screen');
+    screen.classList.add('active');
+
+    document.getElementById('gameover-emoji').textContent = won ? '🏆' : '💀';
+    document.getElementById('gameover-title').textContent = won ? 'Deck Complete!' : 'Game Over';
+    document.getElementById('gameover-sub').textContent =
+      won
+        ? `You placed all ${state.score} cards correctly!`
+        : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
+
+    document.getElementById('final-score').textContent    = state.score;
+    document.getElementById('final-streak').textContent   = state.bestStreak;
+    document.getElementById('final-cards').textContent    = state.cardsAttempted;
+    document.getElementById('final-time').textContent     = formatTime(state.elapsedSeconds);
+
+    const accuracy = state.cardsAttempted > 0
+      ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+    document.getElementById('final-accuracy').textContent = accuracy + '%';
+
+    // Ring animation
+    const circumference = 327;
+    const progress = state.cardsAttempted > 0 ? state.score / state.cardsAttempted : 0;
+    const dash = circumference * (1 - progress);
+    setTimeout(() => {
+      document.getElementById('ring-fill').style.strokeDashoffset = dash;
+    }, 100);
+
+    // Submit to Firestore
+    if (!state.submitted && state.firebaseReady && state.teamCode) {
+      await submitScore(accuracy);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     SCORE SUBMISSION
+  ═══════════════════════════════════════════════════════════ */
+  async function submitScore(accuracy) {
+    state.submitted = true;
+    document.getElementById('submit-overlay').classList.add('visible');
+
+    try {
+      const db  = window._db;
+      await window._updateDoc(
+        window._doc(db, 'bidtrivia', state.teamCode),
+        {
+          endedAt:        window._serverTimestamp(),
+          status:         'completed',
+          score:          state.score,
+          accuracy:       accuracy,
+          bestStreak:     state.bestStreak,
+          cardsSeen:      state.cardsAttempted,
+          elapsedSeconds: state.elapsedSeconds,
+        }
+      );
+      document.getElementById('score-submitted-banner').style.display = 'flex';
+    } catch (err) {
+      console.error('Score submission failed:', err);
+      showToast('⚠️ Score submission failed. Contact the host.', 'wrong');
+    } finally {
+      document.getElementById('submit-overlay').classList.remove('visible');
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     TIMER
+  ═══════════════════════════════════════════════════════════ */
+  function startTimer() {
+    stopTimer();
+    const startTime = Date.now() - (state.elapsedSeconds * 1000);
+    state.timerInterval = setInterval(() => {
+      state.elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById('timer-display').textContent = formatTime(state.elapsedSeconds);
+    }, 500);
+  }
+
+  function stopTimer() {
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
+  }
+
+  function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     RENDERING
+  ═══════════════════════════════════════════════════════════ */
+  function renderAll() {
+    renderLives();
+    renderStats();
+    renderActiveCard();
+    renderTimeline();
+    renderProgress();
+  }
+
+  function renderLives() {
+    const el = document.getElementById('lives-display');
+    el.innerHTML = '';
+    for (let i = 0; i < LIVES; i++) {
+      const span = document.createElement('span');
+      span.className = 'life' + (i >= state.lives ? ' lost' : '');
+      span.textContent = '❤️';
+      el.appendChild(span);
+    }
+  }
+
+  function renderStats() {
+    document.getElementById('streak-display').textContent = state.streak;
+    document.getElementById('score-display').textContent  = state.score;
+    renderLives();
+  }
+
+  function renderProgress() {
+    const total   = state.deck.length;
+    const current = state.cardIndex + 1;
+    document.getElementById('progress-text').textContent =
+      `Card ${Math.min(current, total)} of ${total}`;
+  }
+
+  function renderActiveCard() {
+    const card = activeCard();
+    if (!card) return;
+    document.getElementById('active-course').textContent    = card.course;
+    document.getElementById('active-professor').textContent = card.professor || '';
+    document.getElementById('active-campus').textContent    = card.campus || '';
+    const termPhase = [card.term, card.phase].filter(Boolean).join(' · ');
+    document.getElementById('active-term-phase').textContent = termPhase;
+    document.getElementById('active-bids').textContent      = card.bids.toLocaleString();
+    document.getElementById('active-seats').textContent     = card.seats.toLocaleString();
+  }
+
+  function renderTimeline() {
+    const tl = document.getElementById('timeline');
+    tl.innerHTML = '';
+    const sorted = state.timeline;
+
+    for (let i = 0; i <= sorted.length; i++) {
+      tl.appendChild(createSlot(i));
+      if (i < sorted.length) {
+        tl.appendChild(createPlacedCard(sorted[i]));
+      }
+    }
+  }
+
+  function createSlot(index) {
+    const slot  = document.createElement('div');
+    slot.className  = 'slot';
+    slot.dataset.slot = index;
+    slot.id = 'slot-' + index;
+    const inner = document.createElement('div');
+    inner.className = 'slot-inner';
+    slot.appendChild(inner);
+
+    slot.addEventListener('click',     () => handlePlacement(index));
+    slot.addEventListener('dragover',  (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
+    slot.addEventListener('dragleave', ()  => slot.classList.remove('drag-over'));
+    slot.addEventListener('drop',      (e) => { e.preventDefault(); slot.classList.remove('drag-over'); handlePlacement(index); });
+    return slot;
+  }
+
+  function createPlacedCard(card) {
+    const el = document.createElement('div');
+    el.className = 'card card--placed';
+    const termPhase = [card.term, card.phase].filter(Boolean).join(' · ');
+    el.innerHTML = `
+      <div class="card-course-name">${card.course}</div>
+      ${card.professor ? `<div class="card-professor">${card.professor}</div>` : ''}
+      ${card.campus    ? `<div class="card-campus">${card.campus}</div>`       : ''}
+      <div class="card-term-phase">${termPhase}</div>
+      <div class="cost-reveal">
+        <div class="cost-reveal-label">Cost</div>
+        <div class="cost-reveal-value">${card.cost.toLocaleString()} pts</div>
+      </div>
+    `;
+    return el;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     DRAG & DROP
+  ═══════════════════════════════════════════════════════════ */
+  function initDragDrop() {
+    const ac = document.getElementById('active-card');
+    ac.addEventListener('dragstart', (e) => {
+      state.dragging = true;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => ac.style.opacity = '0.5', 0);
+    });
+    ac.addEventListener('dragend', () => {
+      state.dragging = false;
+      ac.style.opacity = '';
+      document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+    });
+    ac.addEventListener('click', () => {
+      if (state.isAnimating) return;
+      state.clickMode = !state.clickMode;
+      ac.classList.toggle('card--picked', state.clickMode);
+      if (state.clickMode) showToast('Now tap a slot on the timeline ↓', 'info');
+    });
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     UTILITIES
+  ═══════════════════════════════════════════════════════════ */
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  let toastTimer = null;
+  function showToast(msg, type = 'info') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = `toast ${type} show`;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+
+  function scrollTimelineToCenter() {
+    const wrap = document.getElementById('timeline-scroll-wrap');
+    if (!wrap) return;
+    setTimeout(() => { wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2; }, 100);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     INIT
+  ═══════════════════════════════════════════════════════════ */
+  document.addEventListener('DOMContentLoaded', () => {
+    initDragDrop();
+  });
+  </script>
+
+  <!--
+  ═══════════════════════════════════════════════════════════════
+  RECOMMENDED FIRESTORE SECURITY RULES
+  (paste into Firebase console → Firestore → Rules)
+  ═══════════════════════════════════════════════════════════════
+
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      // Single codes document at /tournament/codes
+      // Fields are code strings (e.g. "AB12"), values are booleans (false = unused)
+      // Allow reads and updates so the client can claim codes via transaction.
+      // Do NOT allow create/delete so teams can't add their own codes.
+      match /tournament/{doc} {
+        allow read, update: if true;
+        allow create, delete: if false;
+      }
+
+      // Bidtrivia scores: one doc per team, named by their code
+      match /bidtrivia/{code} {
+        allow read, write: if true;
+      }
+    }
+  }
+  ═══════════════════════════════════════════════════════════════
+  -->
+</body>
+</html>
