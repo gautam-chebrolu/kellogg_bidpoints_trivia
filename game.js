@@ -419,13 +419,13 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
 
       let dx = 0, dy = -28, scale = 1.06;
 
-      if (activeRect) {
+      if (originRect) {
         // Vector from this card’s centre to the active card’s centre
-        dx    = (activeRect.left + activeRect.width  / 2)
+        dx    = (originRect.left + originRect.width  / 2)
               - (afterRect.left  + afterRect.width   / 2);
-        dy    = (activeRect.top  + activeRect.height / 2)
+        dy    = (originRect.top  + originRect.height / 2)
               - (afterRect.top   + afterRect.height  / 2);
-        scale = Math.min(activeRect.width / afterRect.width, 1.6);
+        scale = Math.min(originRect.width / afterRect.width, 1.6);
       }
 
       // Stamp the card at its “before” transform instantly (no transition)
