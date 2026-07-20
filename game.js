@@ -27,7 +27,21 @@ const CONFIG = {
   LIVES:        3,
   CARDS_PER_GAME: 15,
   MIN_COST_SPREAD: 5,   // min unique cost values needed to start
+
+  // ── Leaderboard settings ──────────────────────────────────────────────────
+  // Set to true to show only each player's best score on the leaderboard.
+  // Currently false — all game entries are shown independently.
+  // Flip to true when ready to enable deduplication.
+  DEDUPLICATE_BY_NAME: false,
+
+  LB_TOP_N: 10,   // number of entries to show per period
 };
+
+/* ═══════════════════════════════════════════════════
+   LOCAL STORAGE KEYS
+   ═══════════════════════════════════════════════════ */
+const LS_ALLTIME_BEST   = 'bidtrivia_alltime_best_streak';
+const LS_LAST_STREAK    = 'bidtrivia_last_streak';
 
 /* ═══════════════════════════════════════════════════
    SAMPLE DATA  (fallback when CSV can't be loaded)
@@ -82,6 +96,26 @@ const SAMPLE_DATA = [
 ];
 
 /* ═══════════════════════════════════════════════════
+   FIREBASE INIT
+   ═══════════════════════════════════════════════════ */
+let db = null;
+
+function initFirebase() {
+  try {
+    if (typeof window.FIREBASE_CONFIG === 'undefined') {
+      console.warn('BidTrivia: firebase-config.js not found — leaderboard disabled.');
+      return;
+    }
+    if (!firebase.apps.length) {
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+    }
+    db = firebase.firestore();
+  } catch (e) {
+    console.warn('BidTrivia: Firebase init failed —', e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
    STATE
    ═══════════════════════════════════════════════════ */
 let state = {
@@ -97,12 +131,16 @@ let state = {
   isAnimating: false,
   dragging:    false,
   clickMode:   false, // true = card is "picked up", waiting for slot click
+
+  // Leaderboard / session tracking
+  gameStartTime:    null,  // Date object set when game starts
+  scoreSubmitted:   false, // prevent double-submit
+  activeLbPeriod:   'week',
 };
 
 /* ═══════════════════════════════════════════════════
    CSV PARSING
    ═══════════════════════════════════════════════════ */
-
 
 function mapCSVRow(row) {
   const cost = parseFloat(row[CONFIG.COL_COST]);
@@ -182,7 +220,8 @@ function buildDeck() {
 async function startGame() {
   // Show/hide screens
   document.getElementById('start-screen').classList.remove('active');
-  document.getElementById('gameover-screen').classList.remove('active');
+  document.getElementById('gameover-screen') && document.getElementById('gameover-screen').classList.remove('active');
+  document.getElementById('results-screen').classList.remove('active');
   document.getElementById('game-screen').classList.add('active');
 
   if (state.allData.length === 0) {
@@ -191,25 +230,28 @@ async function startGame() {
 
   // Reset state
   const deck = buildDeck();
-  state.deck        = deck.slice(1); // remaining cards
-  state.timeline    = [deck[0]];     // anchor — first card placed automatically
-  state.cardIndex   = 0;
-  state.lives       = CONFIG.LIVES;
-  state.score       = 0;
-  state.streak      = 0;
-  state.bestStreak  = 0;
+  state.deck           = deck.slice(1); // remaining cards
+  state.timeline       = [deck[0]];     // anchor — first card placed automatically
+  state.cardIndex      = 0;
+  state.lives          = CONFIG.LIVES;
+  state.score          = 0;
+  state.streak         = 0;
+  state.bestStreak     = 0;
   state.cardsAttempted = 0;
-  state.isAnimating = false;
-  state.clickMode   = false;
+  state.isAnimating    = false;
+  state.clickMode      = false;
+  state.scoreSubmitted = false;
+  state.gameStartTime  = new Date();    // record start time for leaderboard
 
   renderAll();
   scrollTimelineToCenter();
 }
 
 function goHome() {
-  document.getElementById('gameover-screen').classList.remove('active');
+  document.getElementById('results-screen').classList.remove('active');
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('start-screen').classList.add('active');
+  updatePersonalBestBanner();
 }
 
 function activeCard() {
@@ -256,48 +298,45 @@ async function handlePlacement(slotIndex) {
   const correct = isCorrectPlacement(slotIndex, card.cost);
 
   if (correct) {
-    // ── Correct ──
+    // ── Correct ───────────────────────────────────────────────────────
     state.score++;
     state.streak++;
     if (state.streak > state.bestStreak) state.bestStreak = state.streak;
-    insertIntoTimeline(card, slotIndex);
-    renderTimeline();
+
+    const newCardEl = insertAndAnimate(card, slotIndex);
     renderStats();
-    // Highlight the newly placed card
-    const placed = document.querySelectorAll('.card--placed');
-    const newCard = placed[slotIndex];
-    if (newCard) newCard.classList.add('card--correct');
+    if (newCardEl) newCardEl.classList.add('card--correct');
     showToast(streakMessage(state.streak), 'correct');
-    await delay(500);
-    if (newCard) newCard.classList.remove('card--correct');
+    await delay(550);
+    if (newCardEl) newCardEl.classList.remove('card--correct');
     advanceCard();
+
   } else {
-    // ── Wrong ──
+    // ── Wrong ────────────────────────────────────────────────────────
     state.lives--;
     state.streak = 0;
-    renderStats();
+
     // Shake the active card
     const ac = document.getElementById('active-card');
     ac.classList.add('shake');
-    ac.style.animation = 'none'; // pause pulse briefly
+    ac.style.animation = 'none';
     setTimeout(() => {
       ac.classList.remove('shake');
       ac.style.animation = '';
     }, 600);
-    // Find and show correct position
+
+    // Fly card to the correct position with red glow
     const correctSlot = findCorrectSlot(card.cost);
-    insertIntoTimeline(card, correctSlot);
-    renderTimeline();
-    const placed = document.querySelectorAll('.card--placed');
-    const wrongCard = placed[correctSlot];
-    if (wrongCard) wrongCard.classList.add('card--wrong');
+    const newCardEl   = insertAndAnimate(card, correctSlot);
+    renderStats();
+    if (newCardEl) newCardEl.classList.add('card--wrong');
     showToast(`❌ It cost ${card.cost} pts — placing it correctly`, 'wrong');
     await delay(1500);
-    if (wrongCard) wrongCard.classList.remove('card--wrong');
+    if (newCardEl) newCardEl.classList.remove('card--wrong');
 
     if (state.lives <= 0) {
       await delay(400);
-      showGameOver();
+      showResults();
       return;
     }
     advanceCard();
@@ -306,11 +345,126 @@ async function handlePlacement(slotIndex) {
   state.isAnimating = false;
 }
 
+/* ═══════════════════════════════════════════════════
+   FLIP ANIMATION  (insert + animate)
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * Returns a stable string key for a placed card DOM element.
+ * Used to match elements before vs after a DOM rebuild.
+ */
+function getCardKey(el) {
+  const name = el.querySelector('.card-course-name')?.textContent?.trim() ?? '';
+  const cost = el.querySelector('.cost-reveal-value')?.textContent?.trim() ?? '';
+  return `${name}||${cost}`;
+}
+
+/**
+ * Inserts `card` into state.timeline at `slotIndex`, rebuilds the
+ * timeline DOM, then drives smooth CSS transitions:
+ *
+ *   • New card   — starts at the active-card’s screen position and
+ *                  flies into its slot with a spring ease.
+ *   • Moved cards — FLIP: instantly placed at their OLD screen
+ *                  position via transform, then transitioned to
+ *                  their NEW positions.
+ *
+ * Returns the new card’s DOM element so callers can add
+ * .card--correct / .card--wrong highlights.
+ */
+function insertAndAnimate(card, slotIndex) {
+  // ── 1. Snapshot “before” screen positions of all placed cards ───────────
+  const beforeEls   = [...document.querySelectorAll('.card--placed')];
+  const beforeRects = new Map();
+  beforeEls.forEach(el => beforeRects.set(getCardKey(el), el.getBoundingClientRect()));
+
+  // Capture active card’s centre — new card will fly from here
+  const activeEl   = document.getElementById('active-card');
+  const activeRect = activeEl?.getBoundingClientRect() ?? null;
+
+  // ── 2. Mutate state + rebuild DOM ──────────────────────────────────
+  insertIntoTimeline(card, slotIndex);
+  renderTimeline();   // full DOM rebuild, no CSS card-pop anymore
+
+  // ── 3. Animate ───────────────────────────────────────────────────
+  const afterEls = [...document.querySelectorAll('.card--placed')];
+  let newCardEl  = null;
+
+  afterEls.forEach(el => {
+    const key       = getCardKey(el);
+    const afterRect = el.getBoundingClientRect();
+
+    if (!beforeRects.has(key)) {
+      // ─ New card: fly in from the active-card position ─────────────
+      newCardEl = el;
+
+      let dx = 0, dy = -28, scale = 1.06;
+
+      if (activeRect) {
+        // Vector from this card’s centre to the active card’s centre
+        dx    = (activeRect.left + activeRect.width  / 2)
+              - (afterRect.left  + afterRect.width   / 2);
+        dy    = (activeRect.top  + activeRect.height / 2)
+              - (afterRect.top   + afterRect.height  / 2);
+        scale = Math.min(activeRect.width / afterRect.width, 1.6);
+      }
+
+      // Stamp the card at its “before” transform instantly (no transition)
+      el.style.transform  = `translate(${dx}px, ${dy}px) scale(${scale})`;
+      el.style.opacity    = '0';
+      el.style.transition = 'none';
+      el.style.zIndex     = '10';
+      el.style.willChange = 'transform, opacity';
+
+      // Double rAF: first frame paints the “before” state, second kicks off transition
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.style.transition = [
+          'transform 0.48s cubic-bezier(0.34, 1.4, 0.64, 1)',
+          'opacity   0.28s ease',
+        ].join(', ');
+        el.style.transform  = '';
+        el.style.opacity    = '';
+
+        // Clean up after animation completes
+        setTimeout(() => {
+          el.style.transition = '';
+          el.style.zIndex     = '';
+          el.style.willChange = '';
+        }, 550);
+      }));
+
+    } else {
+      // ─ Existing card: FLIP to new position if it moved ───────────
+      const beforeRect = beforeRects.get(key);
+      const dx = beforeRect.left - afterRect.left;
+      const dy = beforeRect.top  - afterRect.top;
+
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        el.style.transform  = `translate(${dx}px, ${dy}px)`;
+        el.style.transition = 'none';
+        el.style.willChange = 'transform';
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)';
+          el.style.transform  = '';
+
+          setTimeout(() => {
+            el.style.transition = '';
+            el.style.willChange = '';
+          }, 420);
+        }));
+      }
+    }
+  });
+
+  return newCardEl;
+}
+
 function advanceCard() {
   state.cardIndex++;
   if (state.cardIndex >= state.deck.length) {
     // Deck exhausted — game won!
-    showGameOver(true);
+    showResults(true);
     return;
   }
   renderActiveCard();
@@ -326,27 +480,29 @@ function streakMessage(streak) {
   return '✅ Correct!';
 }
 
-function showGameOver(won = false) {
+/* ═══════════════════════════════════════════════════
+   RESULTS SCREEN
+   ═══════════════════════════════════════════════════ */
+function showResults(won = false) {
   document.getElementById('game-screen').classList.remove('active');
-  const screen = document.getElementById('gameover-screen');
-  screen.classList.add('active');
+  document.getElementById('results-screen').classList.add('active');
 
-  document.getElementById('gameover-emoji').textContent = won ? '🏆' : '💀';
-  document.getElementById('gameover-title').textContent = won ? 'Deck Complete!' : 'Game Over';
-  document.getElementById('gameover-sub').textContent =
-    won
-      ? `You placed all ${state.score} cards correctly!`
-      : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
+  // ── Header ──────────────────────────────────────
+  document.getElementById('results-emoji').textContent  = won ? '🏆' : '💀';
+  document.getElementById('results-title').textContent  = won ? 'Deck Complete!' : 'Game Over';
+  document.getElementById('results-sub').textContent    = won
+    ? `You placed all ${state.score} cards correctly!`
+    : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
 
-  document.getElementById('final-score').textContent   = state.score;
-  document.getElementById('final-streak').textContent  = state.bestStreak;
-  document.getElementById('final-cards').textContent   = state.cardsAttempted;
+  // ── Score ring ───────────────────────────────────
+  document.getElementById('final-score').textContent    = state.score;
+  document.getElementById('final-streak').textContent   = state.bestStreak;
+  document.getElementById('final-cards').textContent    = state.cardsAttempted;
 
   const accuracy = state.cardsAttempted > 0
     ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
   document.getElementById('final-accuracy').textContent = accuracy + '%';
 
-  // Animate ring
   const circumference = 327;
   const progress = state.cardsAttempted > 0
     ? state.score / state.cardsAttempted : 0;
@@ -354,6 +510,241 @@ function showGameOver(won = false) {
   setTimeout(() => {
     document.getElementById('ring-fill').style.strokeDashoffset = dash;
   }, 100);
+
+  // ── Personal best (localStorage) ────────────────
+  const prevBest = parseInt(localStorage.getItem(LS_ALLTIME_BEST) || '0', 10);
+  const newBest  = Math.max(prevBest, state.bestStreak);
+  localStorage.setItem(LS_ALLTIME_BEST, newBest);
+  localStorage.setItem(LS_LAST_STREAK,  state.bestStreak);
+
+  document.getElementById('ps-this-streak').textContent = state.bestStreak;
+  document.getElementById('ps-best-streak').textContent = newBest;
+
+  // Add "new record" shimmer if we beat the previous best
+  const bestEl = document.getElementById('ps-best-streak');
+  if (state.bestStreak > 0 && state.bestStreak >= prevBest) {
+    bestEl.classList.add('new-record');
+  } else {
+    bestEl.classList.remove('new-record');
+  }
+
+  // ── Reset submission UI ──────────────────────────
+  const nameInput = document.getElementById('player-name-input');
+  nameInput.value = '';
+  nameInput.disabled = false;
+  document.getElementById('submit-score-btn').disabled = false;
+  document.getElementById('submit-status').textContent = '';
+  document.getElementById('submit-status').className = 'submit-status';
+  state.scoreSubmitted = false;
+
+  // ── Leaderboard ──────────────────────────────────
+  state.activeLbPeriod = 'week';
+  setActiveTab('week');
+  fetchLeaderboard('week');
+}
+
+/* ═══════════════════════════════════════════════════
+   LEADERBOARD — LOCAL STORAGE BANNER (start screen)
+   ═══════════════════════════════════════════════════ */
+function updatePersonalBestBanner() {
+  const lastStreak  = localStorage.getItem(LS_LAST_STREAK);
+  const alltimeBest = localStorage.getItem(LS_ALLTIME_BEST);
+  const banner = document.getElementById('personal-best-banner');
+  if (!lastStreak && !alltimeBest) {
+    banner.style.display = 'none';
+    return;
+  }
+  banner.style.display = '';
+  document.getElementById('pb-last-streak').textContent   = lastStreak  || '—';
+  document.getElementById('pb-alltime-streak').textContent = alltimeBest || '—';
+}
+
+/* ═══════════════════════════════════════════════════
+   LEADERBOARD — FIRESTORE SUBMIT
+   ═══════════════════════════════════════════════════ */
+async function handleSubmitScore() {
+  if (state.scoreSubmitted) return;
+
+  const nameInput  = document.getElementById('player-name-input');
+  const statusEl   = document.getElementById('submit-status');
+  const submitBtn  = document.getElementById('submit-score-btn');
+  const name       = nameInput.value.trim();
+
+  if (!name) {
+    statusEl.textContent = 'Please enter your name first.';
+    statusEl.className   = 'submit-status error';
+    nameInput.focus();
+    return;
+  }
+
+  if (!db) {
+    statusEl.textContent = 'Leaderboard unavailable (no Firebase connection).';
+    statusEl.className   = 'submit-status error';
+    return;
+  }
+
+  // Compute elapsed seconds
+  const elapsedSeconds = state.gameStartTime
+    ? Math.round((Date.now() - state.gameStartTime.getTime()) / 1000)
+    : null;
+
+  const accuracy = state.cardsAttempted > 0
+    ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+
+  // Document ID = ISO timestamp of game start
+  const docId = state.gameStartTime
+    ? state.gameStartTime.toISOString()
+    : new Date().toISOString();
+
+  const payload = {
+    name,
+    score:          state.score,
+    bestStreak:     state.bestStreak,
+    accuracy,
+    cardsAttempted: state.cardsAttempted,
+    elapsedSeconds,
+    playedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // Disable UI during submit
+  submitBtn.disabled  = true;
+  nameInput.disabled  = true;
+  statusEl.textContent = 'Saving…';
+  statusEl.className   = 'submit-status saving';
+
+  try {
+    await db.collection('bidtrivia_leaderboard').doc(docId).set(payload);
+    state.scoreSubmitted = true;
+    statusEl.textContent = '✅ Score saved! See if you made the top 10.';
+    statusEl.className   = 'submit-status success';
+    // Refresh the currently visible leaderboard
+    fetchLeaderboard(state.activeLbPeriod);
+  } catch (err) {
+    console.error('BidTrivia: score submit failed', err);
+    statusEl.textContent = '❌ Could not save — check your connection.';
+    statusEl.className   = 'submit-status error';
+    submitBtn.disabled   = false;
+    nameInput.disabled   = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   LEADERBOARD — FIRESTORE FETCH
+   ═══════════════════════════════════════════════════ */
+function getPeriodStart(period) {
+  const now = new Date();
+  if (period === 'week') {
+    // Monday of current week
+    const day  = now.getDay();               // 0 = Sun
+    const diff = (day === 0 ? -6 : 1 - day); // days back to Monday
+    const mon  = new Date(now);
+    mon.setDate(now.getDate() + diff);
+    mon.setHours(0, 0, 0, 0);
+    return mon;
+  }
+  // First day of current month
+  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+}
+
+async function fetchLeaderboard(period) {
+  const listEl = document.getElementById('lb-list');
+  listEl.innerHTML = `
+    <div class="lb-loading">
+      <div class="lb-spinner"></div>
+      <span>Loading scores…</span>
+    </div>`;
+
+  if (!db) {
+    listEl.innerHTML = `<p class="lb-empty">Leaderboard unavailable — Firebase not connected.</p>`;
+    return;
+  }
+
+  try {
+    const periodStart = getPeriodStart(period);
+
+    let query = db.collection('bidtrivia_leaderboard')
+      .where('playedAt', '>=', periodStart)
+      .orderBy('playedAt', 'asc'); // secondary: recency (playedAt asc = needed for compound index)
+
+    // We need to order by score desc — Firestore requires the inequality field first,
+    // so we fetch a larger set, sort client-side, and slice top N.
+    const snapshot = await query.get();
+
+    let entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // ── Deduplication scaffolding ─────────────────────────────────────────────
+    // When CONFIG.DEDUPLICATE_BY_NAME is true, keep only each player's best game.
+    // Currently false (show all entries independently).
+    if (CONFIG.DEDUPLICATE_BY_NAME) {
+      const bestByName = new Map();
+      entries.forEach(entry => {
+        const key = entry.name.toLowerCase().trim();
+        const existing = bestByName.get(key);
+        if (!existing || entry.score > existing.score) {
+          bestByName.set(key, entry);
+        }
+      });
+      entries = Array.from(bestByName.values());
+    }
+
+    // Sort by score descending, then by elapsed time ascending as tiebreaker
+    entries.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aTime = a.elapsedSeconds ?? Infinity;
+      const bTime = b.elapsedSeconds ?? Infinity;
+      return aTime - bTime;
+    });
+
+    const top = entries.slice(0, CONFIG.LB_TOP_N);
+    renderLeaderboard(top, period);
+  } catch (err) {
+    console.error('BidTrivia: leaderboard fetch failed', err);
+    listEl.innerHTML = `<p class="lb-empty">Could not load scores — try again shortly.</p>`;
+  }
+}
+
+function renderLeaderboard(entries, period) {
+  const listEl = document.getElementById('lb-list');
+
+  if (entries.length === 0) {
+    const periodLabel = period === 'week' ? 'this week' : 'this month';
+    listEl.innerHTML = `<p class="lb-empty">No scores ${periodLabel} yet — be the first! 🎯</p>`;
+    return;
+  }
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  listEl.innerHTML = entries.map((entry, i) => {
+    const rank        = i + 1;
+    const rankDisplay = medals[i] || `<span class="lb-rank-num">${rank}</span>`;
+    const accuracy    = entry.accuracy != null ? `${entry.accuracy}%` : '—';
+    const streak      = entry.bestStreak != null ? `🔥${entry.bestStreak}` : '';
+    const elapsed     = entry.elapsedSeconds != null ? formatElapsed(entry.elapsedSeconds) : '';
+
+    return `
+      <div class="lb-row ${rank <= 3 ? 'lb-row--top' : ''}" style="animation-delay:${i * 60}ms">
+        <span class="lb-rank">${rankDisplay}</span>
+        <div class="lb-player">
+          <span class="lb-name">${escapeHtml(entry.name)}</span>
+          <span class="lb-meta">${[streak, accuracy, elapsed].filter(Boolean).join(' · ')}</span>
+        </div>
+        <span class="lb-score">${entry.score}</span>
+      </div>`;
+  }).join('');
+}
+
+function switchLeaderboardTab(period) {
+  if (period === state.activeLbPeriod) return;
+  state.activeLbPeriod = period;
+  setActiveTab(period);
+  fetchLeaderboard(period);
+}
+
+function setActiveTab(period) {
+  document.getElementById('lb-tab-week').classList.toggle('active',  period === 'week');
+  document.getElementById('lb-tab-month').classList.toggle('active', period === 'month');
+  document.getElementById('lb-tab-week').setAttribute('aria-selected',  period === 'week');
+  document.getElementById('lb-tab-month').setAttribute('aria-selected', period === 'month');
 }
 
 /* ═══════════════════════════════════════════════════
@@ -529,10 +920,27 @@ function scrollTimelineToCenter() {
   }, 100);
 }
 
+function formatElapsed(seconds) {
+  if (seconds == null || isNaN(seconds)) return '';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /* ═══════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
+  initFirebase();
   await loadData();
   initDragDrop();
+  updatePersonalBestBanner();
 });

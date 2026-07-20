@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Tournament data (existing) ───────────────────────────────────────────
+    // Restrict to your existing tournament collections as needed.
+
+    // ── BidTrivia Public Leaderboard ─────────────────────────────────────────
+    // Public game — anyone can read scores and submit their own score.
+    // Write is restricted to creating new documents only (no editing old ones).
+    match /bidtrivia_leaderboard/{docId} {
+      // Anyone can read the leaderboard
+      allow read: if true;
+
+      // Anyone can create a new score document
+      // (no update/delete — players can't overwrite others' scores)
+      allow create: if true;
+    }
+
+    // ── Default: deny everything else ────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
