@@ -316,7 +316,12 @@ async function handlePlacement(slotIndex) {
     state.lives--;
     state.streak = 0;
 
-    // Shake the active card
+    // Capture the dropped slot's position so the card animates from
+    // where the user actually released it, not from the staging area.
+    const droppedSlotEl = document.getElementById('slot-' + slotIndex);
+    const dropRect      = droppedSlotEl?.getBoundingClientRect() ?? null;
+
+    // Brief shake on the active card (visual feedback)
     const ac = document.getElementById('active-card');
     ac.classList.add('shake');
     ac.style.animation = 'none';
@@ -325,9 +330,9 @@ async function handlePlacement(slotIndex) {
       ac.style.animation = '';
     }, 600);
 
-    // Fly card to the correct position with red glow
+    // Fly card from the dropped slot to the correct position with red glow
     const correctSlot = findCorrectSlot(card.cost);
-    const newCardEl   = insertAndAnimate(card, correctSlot);
+    const newCardEl   = insertAndAnimate(card, correctSlot, dropRect);
     renderStats();
     if (newCardEl) newCardEl.classList.add('card--wrong');
     showToast(`❌ It cost ${card.cost} pts — placing it correctly`, 'wrong');
@@ -363,24 +368,38 @@ function getCardKey(el) {
  * Inserts `card` into state.timeline at `slotIndex`, rebuilds the
  * timeline DOM, then drives smooth CSS transitions:
  *
- *   • New card   — starts at the active-card’s screen position and
- *                  flies into its slot with a spring ease.
+ *   • New card   — starts at the supplied `flyFromRect` (or the
+ *                  active-card's position) and flies into its slot
+ *                  with a spring ease.
  *   • Moved cards — FLIP: instantly placed at their OLD screen
  *                  position via transform, then transitioned to
  *                  their NEW positions.
  *
- * Returns the new card’s DOM element so callers can add
+ * @param {Object}    card        The data object for the card being placed.
+ * @param {number}    slotIndex   Where in the timeline to insert.
+ * @param {DOMRect?}  flyFromRect Optional origin rect — if provided the
+ *                                 new card animates from here instead of
+ *                                 the active-card staging area.  Used on
+ *                                 wrong placements so the card visually
+ *                                 slides from the dropped slot to the
+ *                                 correct slot.
+ *
+ * Returns the new card's DOM element so callers can add
  * .card--correct / .card--wrong highlights.
  */
-function insertAndAnimate(card, slotIndex) {
+function insertAndAnimate(card, slotIndex, flyFromRect) {
   // ── 1. Snapshot “before” screen positions of all placed cards ───────────
   const beforeEls   = [...document.querySelectorAll('.card--placed')];
   const beforeRects = new Map();
   beforeEls.forEach(el => beforeRects.set(getCardKey(el), el.getBoundingClientRect()));
 
-  // Capture active card’s centre — new card will fly from here
-  const activeEl   = document.getElementById('active-card');
-  const activeRect = activeEl?.getBoundingClientRect() ?? null;
+  // Determine the origin rect the new card will fly from.
+  // Priority: explicit flyFromRect > active-card element > null (fallback).
+  let originRect = flyFromRect ?? null;
+  if (!originRect) {
+    const activeEl = document.getElementById('active-card');
+    originRect     = activeEl?.getBoundingClientRect() ?? null;
+  }
 
   // ── 2. Mutate state + rebuild DOM ──────────────────────────────────
   insertIntoTimeline(card, slotIndex);
