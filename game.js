@@ -281,12 +281,13 @@ function insertIntoTimeline(card, slotIndex) {
   state.timeline.splice(slotIndex, 0, card);
 }
 
-async function handlePlacement(slotIndex) {
+async function handlePlacement(slotIndex, placementOrigin = null) {
   if (state.isAnimating) return;
   const card = activeCard();
   if (!card) return;
 
   state.isAnimating = true;
+  setActiveCardHidden(true);
   state.cardsAttempted++;
 
   // Exit click mode
@@ -303,7 +304,7 @@ async function handlePlacement(slotIndex) {
     state.streak++;
     if (state.streak > state.bestStreak) state.bestStreak = state.streak;
 
-    const newCardEl = insertAndAnimate(card, slotIndex);
+    const newCardEl = insertAndAnimate(card, slotIndex, placementOrigin);
     renderStats();
     if (newCardEl) newCardEl.classList.add('card--correct');
     showToast(streakMessage(state.streak), 'correct');
@@ -316,11 +317,6 @@ async function handlePlacement(slotIndex) {
     state.lives--;
     state.streak = 0;
 
-    // Capture the dropped slot's position so the card animates from
-    // where the user actually released it, not from the staging area.
-    const droppedSlotEl = document.getElementById('slot-' + slotIndex);
-    const dropRect      = droppedSlotEl?.getBoundingClientRect() ?? null;
-
     // Brief shake on the active card (visual feedback)
     const ac = document.getElementById('active-card');
     ac.classList.add('shake');
@@ -330,9 +326,9 @@ async function handlePlacement(slotIndex) {
       ac.style.animation = '';
     }, 600);
 
-    // Fly card from the dropped slot to the correct position with red glow
+    // Fly the card from where it was picked up/released to the correct slot.
     const correctSlot = findCorrectSlot(card.cost);
-    const newCardEl   = insertAndAnimate(card, correctSlot, dropRect);
+    const newCardEl   = insertAndAnimate(card, correctSlot, placementOrigin);
     renderStats();
     if (newCardEl) newCardEl.classList.add('card--wrong');
     showToast(`❌ It cost ${card.cost} pts — placing it correctly`, 'wrong');
@@ -359,9 +355,17 @@ async function handlePlacement(slotIndex) {
  * Used to match elements before vs after a DOM rebuild.
  */
 function getCardKey(el) {
-  const name = el.querySelector('.card-course-name')?.textContent?.trim() ?? '';
-  const cost = el.querySelector('.cost-reveal-value')?.textContent?.trim() ?? '';
-  return `${name}||${cost}`;
+  return el.dataset.animationKey;
+}
+
+const cardAnimationKeys = new WeakMap();
+let nextCardAnimationKey = 1;
+
+function getCardAnimationKey(card) {
+  if (!cardAnimationKeys.has(card)) {
+    cardAnimationKeys.set(card, String(nextCardAnimationKey++));
+  }
+  return cardAnimationKeys.get(card);
 }
 
 /**
@@ -389,7 +393,7 @@ function getCardKey(el) {
  */
 function insertAndAnimate(card, slotIndex, flyFromRect) {
   // ── 1. Snapshot “before” screen positions of all placed cards ───────────
-  const beforeEls   = [...document.querySelectorAll('.card--placed')];
+  const beforeEls   = [...document.querySelectorAll('#timeline .card--placed')];
   const beforeRects = new Map();
   beforeEls.forEach(el => beforeRects.set(getCardKey(el), el.getBoundingClientRect()));
 
@@ -406,7 +410,7 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
   renderTimeline();   // full DOM rebuild, no CSS card-pop anymore
 
   // ── 3. Animate ───────────────────────────────────────────────────
-  const afterEls = [...document.querySelectorAll('.card--placed')];
+  const afterEls = [...document.querySelectorAll('#timeline .card--placed')];
   let newCardEl  = null;
 
   afterEls.forEach(el => {
@@ -417,7 +421,7 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
       // ─ New card: fly in from the active-card position ─────────────
       newCardEl = el;
 
-      let dx = 0, dy = -28, scale = 1.06;
+      let dx = 0, dy = -28;
 
       if (originRect) {
         // Vector from this card’s centre to the active card’s centre
@@ -425,24 +429,20 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
               - (afterRect.left  + afterRect.width   / 2);
         dy    = (originRect.top  + originRect.height / 2)
               - (afterRect.top   + afterRect.height  / 2);
-        scale = Math.min(originRect.width / afterRect.width, 1.6);
       }
 
       // Stamp the card at its “before” transform instantly (no transition)
-      el.style.transform  = `translate(${dx}px, ${dy}px) scale(${scale})`;
-      el.style.opacity    = '0';
+      // The moving card already uses timeline dimensions, so only its position
+      // changes. Scaling here would stretch the text and create a morph effect.
+      el.style.transform  = `translate(${dx}px, ${dy}px)`;
       el.style.transition = 'none';
       el.style.zIndex     = '10';
-      el.style.willChange = 'transform, opacity';
+      el.style.willChange = 'transform';
 
       // Double rAF: first frame paints the “before” state, second kicks off transition
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        el.style.transition = [
-          'transform 0.48s cubic-bezier(0.34, 1.4, 0.64, 1)',
-          'opacity   0.28s ease',
-        ].join(', ');
+        el.style.transition = 'transform 0.46s cubic-bezier(0.22, 1, 0.36, 1)';
         el.style.transform  = '';
-        el.style.opacity    = '';
 
         // Clean up after animation completes
         setTimeout(() => {
@@ -804,6 +804,7 @@ function renderProgress() {
 function renderActiveCard() {
   const card = activeCard();
   if (!card) return;
+  setActiveCardHidden(false);
   document.getElementById('active-course').textContent    = card.course;
   document.getElementById('active-professor').textContent = card.professor || '';
   document.getElementById('active-campus').textContent    = card.campus || '';
@@ -851,7 +852,12 @@ function createSlot(index) {
   slot.appendChild(inner);
 
   // Click handler
-  slot.addEventListener('click', () => handlePlacement(index));
+  slot.addEventListener('click', () => {
+    if (state.isAnimating) return;
+    const activeEl = document.getElementById('active-card');
+    const origin = activeEl?.getBoundingClientRect() ?? null;
+    handlePlacement(index, origin);
+  });
 
   // Drag events
   slot.addEventListener('dragover', (e) => {
@@ -862,15 +868,18 @@ function createSlot(index) {
   slot.addEventListener('drop', (e) => {
     e.preventDefault();
     slot.classList.remove('drag-over');
-    handlePlacement(index);
+    const origin = dragPreview?.getBoundingClientRect() ?? null;
+    dragWasDropped = true;
+    handlePlacement(index, origin);
   });
 
   return slot;
 }
 
-function createPlacedCard(card) {
+function createPlacedCard(card, revealCost = true) {
   const el = document.createElement('div');
   el.className = 'card card--placed';
+  el.dataset.animationKey = getCardAnimationKey(card);
 
   const termPhase = [card.term, card.phase].filter(Boolean).join(' · ');
   el.innerHTML = `
@@ -878,9 +887,9 @@ function createPlacedCard(card) {
     ${card.professor ? `<div class="card-professor">${card.professor}</div>` : ''}
     ${card.campus ? `<div class="card-campus">${card.campus}</div>` : ''}
     <div class="card-term-phase">${termPhase}</div>
-    <div class="cost-reveal">
+    <div class="cost-reveal${revealCost ? '' : ' cost-reveal--hidden'}">
       <div class="cost-reveal-label">Cost</div>
-      <div class="cost-reveal-value">${card.cost.toLocaleString()} pts</div>
+      <div class="cost-reveal-value">${revealCost ? `${card.cost.toLocaleString()} pts` : '???'}</div>
     </div>
   `;
   return el;
@@ -894,14 +903,22 @@ function initDragDrop() {
 
   ac.addEventListener('dragstart', (e) => {
     state.dragging = true;
+    dragWasDropped = false;
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => ac.style.opacity = '0.5', 0);
+    createDragPreview(ac, activeCard(), e.clientX, e.clientY);
+    e.dataTransfer.setDragImage(transparentDragImage, 0, 0);
+    requestAnimationFrame(() => setActiveCardHidden(true));
   });
 
   ac.addEventListener('dragend', () => {
     state.dragging = false;
-    ac.style.opacity = '';
+    removeDragPreview();
+    if (!dragWasDropped) setActiveCardHidden(false);
     document.querySelectorAll('.slot').forEach(s => s.classList.remove('drag-over'));
+  });
+
+  document.addEventListener('dragover', (e) => {
+    if (dragPreview && e.clientX && e.clientY) moveDragPreview(e.clientX, e.clientY);
   });
 
   // Click-to-pick-up for mobile / keyboard
@@ -913,6 +930,46 @@ function initDragDrop() {
       showToast('Now tap a slot on the timeline ↓', 'info');
     }
   });
+}
+
+let dragPreview = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+let dragWasDropped = false;
+const transparentDragImage = new Image();
+transparentDragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+
+function createDragPreview(source, card, pointerX, pointerY) {
+  removeDragPreview();
+  const sourceRect = source.getBoundingClientRect();
+  const pointerRatioX = (pointerX - sourceRect.left) / sourceRect.width;
+  const pointerRatioY = (pointerY - sourceRect.top) / sourceRect.height;
+
+  // Render the preview with the timeline card's real markup and typography.
+  // This makes the width change instant instead of squeezing the wide text.
+  dragPreview = createPlacedCard(card, false);
+  dragPreview.classList.add('card--drag-preview');
+  document.body.appendChild(dragPreview);
+
+  const previewRect = dragPreview.getBoundingClientRect();
+  dragOffsetX = pointerRatioX * previewRect.width;
+  dragOffsetY = pointerRatioY * previewRect.height;
+  moveDragPreview(pointerX, pointerY);
+}
+
+function moveDragPreview(pointerX, pointerY) {
+  dragPreview.style.left = `${pointerX - dragOffsetX}px`;
+  dragPreview.style.top = `${pointerY - dragOffsetY}px`;
+}
+
+function removeDragPreview() {
+  dragPreview?.remove();
+  dragPreview = null;
+}
+
+function setActiveCardHidden(hidden) {
+  document.getElementById('active-card')
+    ?.classList.toggle('card--source-hidden', hidden);
 }
 
 /* ═══════════════════════════════════════════════════

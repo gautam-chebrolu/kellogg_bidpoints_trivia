@@ -349,6 +349,24 @@ body {
   animation: pulse-border 2.5s ease-in-out infinite;
 }
 .card--active:active { cursor: grabbing; transform: scale(1.02) rotate(1deg); }
+.card.card--source-hidden {
+  visibility: hidden;
+  transition: none;
+  animation: none;
+}
+.card.card--drag-preview {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  cursor: grabbing;
+  opacity: 1;
+  transform: none;
+  transition: none;
+  animation: none;
+  box-shadow: 0 16px 38px rgba(0,0,0,0.18), 0 0 0 1px var(--purple-mid);
+  will-change: left, top;
+}
 @keyframes pulse-border {
   0%, 100% { box-shadow: 0 0 0 1px var(--purple-mid), 0 8px 24px rgba(0,0,0,0.1), 0 0 20px var(--purple-glow); }
   50% { box-shadow: 0 0 0 1px var(--purple-light), 0 8px 24px rgba(0,0,0,0.1), 0 0 36px var(--purple-glow); }
@@ -441,6 +459,8 @@ body {
 }
 .cost-reveal-label { font-size: 0.58rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
 .cost-reveal-value { font-size: 1.1rem; font-weight: 800; color: var(--purple); }
+.cost-reveal--hidden .cost-reveal-label,
+.cost-reveal--hidden .cost-reveal-value { color: var(--gold); }
 
 /* correct/wrong highlights */
 .card--correct {
