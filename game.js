@@ -252,6 +252,7 @@ function goHome() {
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('start-screen').classList.add('active');
   updatePersonalBestBanner();
+  fetchStartScreenLeaderboard();
 }
 
 function activeCard() {
@@ -513,7 +514,7 @@ function showResults(won = false) {
     ? `You placed all ${state.score} cards correctly!`
     : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
 
-  // ── Score ring ───────────────────────────────────
+  // ── Score stats ─────────────────────────────────
   document.getElementById('final-score').textContent    = state.score;
   document.getElementById('final-streak').textContent   = state.bestStreak;
   document.getElementById('final-cards').textContent    = state.cardsAttempted;
@@ -521,14 +522,6 @@ function showResults(won = false) {
   const accuracy = state.cardsAttempted > 0
     ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
   document.getElementById('final-accuracy').textContent = accuracy + '%';
-
-  const circumference = 327;
-  const progress = state.cardsAttempted > 0
-    ? state.score / state.cardsAttempted : 0;
-  const dash = circumference * (1 - progress);
-  setTimeout(() => {
-    document.getElementById('ring-fill').style.strokeDashoffset = dash;
-  }, 100);
 
   // ── Personal best (localStorage) ────────────────
   const prevBest = parseInt(localStorage.getItem(LS_ALLTIME_BEST) || '0', 10);
@@ -556,10 +549,78 @@ function showResults(won = false) {
   document.getElementById('submit-status').className = 'submit-status';
   state.scoreSubmitted = false;
 
+  // ── Reset share button ───────────────────────────
+  const shareBtn = document.getElementById('share-btn');
+  if (shareBtn) {
+    shareBtn.classList.remove('copied');
+    shareBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Share Result`;
+  }
+
   // ── Leaderboard ──────────────────────────────────
   state.activeLbPeriod = 'week';
   setActiveTab('week');
   fetchLeaderboard('week');
+}
+
+/* ═══════════════════════════════════════════════════
+   SHARE RESULT
+   ═══════════════════════════════════════════════════ */
+async function handleShareResult() {
+  const accuracy = state.cardsAttempted > 0
+    ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+
+  const lines = [
+    `📚 BidTrivia`,
+    ``,
+    `Score: ${state.score}/${state.cardsAttempted} · Streak: ${state.bestStreak} · Accuracy: ${accuracy}%`,
+    ``,
+    `Think you know the Kellogg bid market better?`,
+    `Play → kelloggbidpoints.com`,
+  ];
+  const shareText = lines.join('\n');
+
+  const shareBtn = document.getElementById('share-btn');
+
+  // Try native share on mobile, clipboard on desktop
+  if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+    try {
+      await navigator.share({ text: shareText });
+    } catch (e) {
+      // User cancelled or share failed — fall through to clipboard
+      if (e.name !== 'AbortError') {
+        await copyToClipboard(shareText, shareBtn);
+      }
+    }
+  } else {
+    await copyToClipboard(shareText, shareBtn);
+  }
+}
+
+async function copyToClipboard(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+
+  // Visual feedback
+  if (btn) {
+    btn.classList.add('copied');
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Share Result`;
+    }, 2500);
+  }
+
+  showToast('Copied to clipboard!', 'info');
 }
 
 /* ═══════════════════════════════════════════════════
@@ -665,8 +726,9 @@ function getPeriodStart(period) {
   return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
 }
 
-async function fetchLeaderboard(period) {
-  const listEl = document.getElementById('lb-list');
+async function fetchLeaderboard(period, listElId = 'lb-list') {
+  const listEl = document.getElementById(listElId);
+  if (!listEl) return;
   listEl.innerHTML = `
     <div class="lb-loading">
       <div class="lb-spinner"></div>
@@ -715,15 +777,16 @@ async function fetchLeaderboard(period) {
     });
 
     const top = entries.slice(0, CONFIG.LB_TOP_N);
-    renderLeaderboard(top, period);
+    renderLeaderboard(top, period, listElId);
   } catch (err) {
     console.error('BidTrivia: leaderboard fetch failed', err);
     listEl.innerHTML = `<p class="lb-empty">Could not load scores — try again shortly.</p>`;
   }
 }
 
-function renderLeaderboard(entries, period) {
-  const listEl = document.getElementById('lb-list');
+function renderLeaderboard(entries, period, listElId = 'lb-list') {
+  const listEl = document.getElementById(listElId);
+  if (!listEl) return;
 
   if (entries.length === 0) {
     const periodLabel = period === 'week' ? 'this week' : 'this month';
@@ -752,11 +815,12 @@ function renderLeaderboard(entries, period) {
   }).join('');
 }
 
+/* ── Results-screen leaderboard tabs ── */
 function switchLeaderboardTab(period) {
   if (period === state.activeLbPeriod) return;
   state.activeLbPeriod = period;
   setActiveTab(period);
-  fetchLeaderboard(period);
+  fetchLeaderboard(period, 'lb-list');
 }
 
 function setActiveTab(period) {
@@ -764,6 +828,23 @@ function setActiveTab(period) {
   document.getElementById('lb-tab-month').classList.toggle('active', period === 'month');
   document.getElementById('lb-tab-week').setAttribute('aria-selected',  period === 'week');
   document.getElementById('lb-tab-month').setAttribute('aria-selected', period === 'month');
+}
+
+/* ── Start-screen leaderboard tabs ── */
+let startLbPeriod = 'week';
+
+function switchStartLeaderboardTab(period) {
+  if (period === startLbPeriod) return;
+  startLbPeriod = period;
+  document.getElementById('start-lb-tab-week').classList.toggle('active',  period === 'week');
+  document.getElementById('start-lb-tab-month').classList.toggle('active', period === 'month');
+  document.getElementById('start-lb-tab-week').setAttribute('aria-selected',  period === 'week');
+  document.getElementById('start-lb-tab-month').setAttribute('aria-selected', period === 'month');
+  fetchLeaderboard(period, 'start-lb-list');
+}
+
+function fetchStartScreenLeaderboard() {
+  fetchLeaderboard(startLbPeriod, 'start-lb-list');
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1019,4 +1100,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadData();
   initDragDrop();
   updatePersonalBestBanner();
+  fetchStartScreenLeaderboard();
 });

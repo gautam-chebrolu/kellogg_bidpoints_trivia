@@ -13,55 +13,67 @@
 
   <!-- ═══════════════ START SCREEN ═══════════════ -->
   <div id="start-screen" class="screen active">
-    <div class="stars" aria-hidden="true">
-      <div class="star"></div><div class="star"></div><div class="star"></div>
-      <div class="star"></div><div class="star"></div><div class="star"></div>
-      <div class="star"></div><div class="star"></div><div class="star"></div>
-    </div>
     <div class="start-content">
-      <div class="start-logo">
-        <div class="logo-icon">📚</div>
-        <h1>BidTrivia</h1>
-        <p class="tagline">How well do you know the Kellogg bid market?</p>
+
+      <div class="start-hero">
+        <h1 class="start-title">BidTrivia</h1>
+        <p class="start-tagline">How well do you know the Kellogg bid market?</p>
       </div>
 
-      <!-- Personal Best Badge (shown only if localStorage has data) -->
-      <div id="personal-best-banner" class="personal-best-banner" style="display:none;">
-        <div class="pb-row">
-          <div class="pb-stat">
-            <span class="pb-label">Last Streak</span>
-            <span id="pb-last-streak" class="pb-value">—</span>
+      <div class="start-body">
+
+        <!-- Left column: rules + play -->
+        <div class="start-left">
+          <div class="how-to-play">
+            <h2>How to Play</h2>
+            <ol class="steps-flat">
+              <li>You see a course card with all details — except the <strong>closing cost</strong>.</li>
+              <li>Place it on the <strong>cost timeline</strong> relative to already-placed cards.</li>
+              <li>Keep your streak alive — <strong>three misses</strong> and it's game over.</li>
+            </ol>
           </div>
-          <div class="pb-divider"></div>
-          <div class="pb-stat">
-            <span class="pb-label">All-Time Best</span>
-            <span id="pb-alltime-streak" class="pb-value">—</span>
+
+          <!-- Personal Best Badge (shown only if localStorage has data) -->
+          <div id="personal-best-banner" class="personal-best-banner" style="display:none;">
+            <div class="pb-row">
+              <div class="pb-stat">
+                <span class="pb-label">Last Streak</span>
+                <span id="pb-last-streak" class="pb-value">—</span>
+              </div>
+              <div class="pb-divider"></div>
+              <div class="pb-stat">
+                <span class="pb-label">All-Time Best</span>
+                <span id="pb-alltime-streak" class="pb-value">—</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="start-btn" class="btn-start" onclick="startGame()">
+            Start Game
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+          </button>
+        </div>
+
+        <!-- Right column: leaderboard -->
+        <div class="start-right">
+          <div class="leaderboard-section start-lb">
+            <div class="lb-header">
+              <h2 class="lb-title">Leaderboard</h2>
+            </div>
+            <div class="lb-tabs" role="tablist">
+              <button id="start-lb-tab-week" class="lb-tab active" role="tab" aria-selected="true" onclick="switchStartLeaderboardTab('week')">This Week</button>
+              <button id="start-lb-tab-month" class="lb-tab" role="tab" aria-selected="false" onclick="switchStartLeaderboardTab('month')">This Month</button>
+            </div>
+            <div id="start-lb-list" class="lb-list">
+              <div class="lb-loading">
+                <div class="lb-spinner"></div>
+                <span>Loading scores…</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="how-to-play">
-        <h2>How to Play</h2>
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
-            <div class="step-text">You'll see a course card — name, term, professor, phase, bids, and seats — but the <strong>closing cost is hidden</strong>.</div>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <div class="step-text">Place it on the <strong>cost timeline</strong> where you think it belongs relative to already-placed cards.</div>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <div class="step-text">Get it right to grow your streak. <strong>Three wrong placements</strong> and game over!</div>
-          </div>
-        </div>
       </div>
-
-      <button id="start-btn" class="btn-primary" onclick="startGame()">
-        <span>Start Game</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-      </button>
     </div>
   </div>
 
@@ -141,7 +153,6 @@
 
   <!-- ═══════════════ RESULTS SCREEN ═══════════════ -->
   <div id="results-screen" class="screen">
-    <div class="results-bg-glow" aria-hidden="true"></div>
     <div class="results-scroll-wrap">
       <div class="results-content">
 
@@ -152,31 +163,31 @@
           <p id="results-sub" class="results-sub"></p>
         </div>
 
-        <!-- Score Ring -->
-        <div class="final-score-ring">
-          <svg viewBox="0 0 120 120" class="ring-svg">
-            <circle cx="60" cy="60" r="52" class="ring-bg"/>
-            <circle cx="60" cy="60" r="52" class="ring-fill" id="ring-fill"/>
-          </svg>
-          <div class="ring-inner">
-            <div id="final-score" class="ring-number">0</div>
-            <div class="ring-label">correct</div>
+        <!-- Score Stats Row -->
+        <div class="results-stats">
+          <div class="rs-stat">
+            <span id="final-score" class="rs-val">0</span>
+            <span class="rs-label">Score</span>
+          </div>
+          <div class="rs-divider"></div>
+          <div class="rs-stat">
+            <span id="final-streak" class="rs-val">0</span>
+            <span class="rs-label">Best Streak</span>
+          </div>
+          <div class="rs-divider"></div>
+          <div class="rs-stat">
+            <span id="final-accuracy" class="rs-val">0%</span>
+            <span class="rs-label">Accuracy</span>
+          </div>
+          <div class="rs-divider"></div>
+          <div class="rs-stat">
+            <span id="final-cards" class="rs-val">0</span>
+            <span class="rs-label">Cards Seen</span>
           </div>
         </div>
 
-        <!-- This Game Stats -->
-        <div class="gameover-stats">
-          <div class="go-stat"><span class="go-stat-val" id="final-streak">0</span><span class="go-stat-label">Best Streak</span></div>
-          <div class="go-stat"><span class="go-stat-val" id="final-accuracy">0%</span><span class="go-stat-label">Accuracy</span></div>
-          <div class="go-stat"><span class="go-stat-val" id="final-cards">0</span><span class="go-stat-label">Cards Seen</span></div>
-        </div>
-
-        <!-- Personal Best Card -->
+        <!-- Personal Best -->
         <div class="personal-stats-card">
-          <div class="ps-header">
-            <span class="ps-icon">✨</span>
-            <span class="ps-title">Your Personal Best</span>
-          </div>
           <div class="ps-stats">
             <div class="ps-stat">
               <span class="ps-stat-label">This Game</span>
@@ -192,68 +203,55 @@
           </div>
         </div>
 
-        <!-- Name Submission -->
-        <div class="name-form-card" id="name-form-card">
-          <p class="name-form-prompt">Save your score to the leaderboard!</p>
-          <div class="name-input-row">
-            <input
-              id="player-name-input"
-              class="name-input"
-              type="text"
-              placeholder="Enter your name…"
-              maxlength="30"
-              autocomplete="off"
-              spellcheck="false"
-            >
-            <button id="submit-score-btn" class="btn-submit" onclick="handleSubmitScore()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
-              Submit
-            </button>
-          </div>
-          <p id="submit-status" class="submit-status"></p>
-        </div>
-
-        <!-- Leaderboard Section -->
-        <div class="leaderboard-section">
-          <div class="lb-header">
-            <span class="lb-title-icon">🏅</span>
-            <h2 class="lb-title">Leaderboard</h2>
-          </div>
-
-          <!-- Period Toggle -->
-          <div class="lb-tabs" role="tablist">
-            <button
-              id="lb-tab-week"
-              class="lb-tab active"
-              role="tab"
-              aria-selected="true"
-              onclick="switchLeaderboardTab('week')"
-            >This Week</button>
-            <button
-              id="lb-tab-month"
-              class="lb-tab"
-              role="tab"
-              aria-selected="false"
-              onclick="switchLeaderboardTab('month')"
-            >This Month</button>
-          </div>
-
-          <!-- Leaderboard List -->
-          <div id="lb-list" class="lb-list">
-            <div class="lb-loading">
-              <div class="lb-spinner"></div>
-              <span>Loading scores…</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
+        <!-- Share + Play Again -->
         <div class="results-actions">
+          <button id="share-btn" class="btn-share" onclick="handleShareResult()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share Result
+          </button>
           <button class="btn-primary" onclick="startGame()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
             Play Again
           </button>
           <button class="btn-secondary" onclick="goHome()">Home</button>
+        </div>
+
+        <!-- Submit Score + Leaderboard -->
+        <div class="results-bottom">
+          <div class="name-form-card" id="name-form-card">
+            <div class="name-input-row">
+              <input
+                id="player-name-input"
+                class="name-input"
+                type="text"
+                placeholder="Enter your name…"
+                maxlength="30"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button id="submit-score-btn" class="btn-submit" onclick="handleSubmitScore()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></svg>
+                Submit
+              </button>
+            </div>
+            <p id="submit-status" class="submit-status"></p>
+          </div>
+
+          <div class="leaderboard-section">
+            <div class="lb-header">
+              <h2 class="lb-title">Leaderboard</h2>
+            </div>
+            <div class="lb-tabs" role="tablist">
+              <button id="lb-tab-week" class="lb-tab active" role="tab" aria-selected="true" onclick="switchLeaderboardTab('week')">This Week</button>
+              <button id="lb-tab-month" class="lb-tab" role="tab" aria-selected="false" onclick="switchLeaderboardTab('month')">This Month</button>
+            </div>
+            <div id="lb-list" class="lb-list">
+              <div class="lb-loading">
+                <div class="lb-spinner"></div>
+                <span>Loading scores…</span>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
