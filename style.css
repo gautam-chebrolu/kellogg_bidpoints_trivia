@@ -411,6 +411,17 @@ body {
   letter-spacing: 0.06em;
   font-weight: 500;
 }
+.card-schedule-sep {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+.card-schedule {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
 .card-term-phase {
   font-size: 0.78rem;
   color: var(--text-2);
@@ -449,6 +460,7 @@ body {
 .card--placed .card-term-phase  { font-size: 0.65rem; }
 .card--placed .card-professor   { font-size: 0.65rem; }
 .card--placed .card-campus      { font-size: 0.58rem; }
+.card--placed .card-schedule    { font-size: 0.58rem; }
 .card--placed .card-badge { font-size: 0.62rem; padding: 0.15rem 0.45rem; }
 .cost-reveal {
   margin-top: 0.25rem;

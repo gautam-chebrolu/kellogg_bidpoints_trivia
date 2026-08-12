@@ -15,16 +15,16 @@ const CONFIG = {
   DATA_PATH: 'data/kellogg_bid_stats.csv',
 
   // Map to your actual CSV column headers (kellogg_bid_stats.csv):
-  COL_COURSE:  'Course Title',
-  COL_TERM:    'Term',          // e.g. "Fall 2023" — parsed into quarter + year
-  COL_PHASE:   'Phase',         // e.g. "Fall 2023 Bid Phase 1" — term prefix is stripped
-  COL_BIDS:    'Number of Bids',
-  COL_SEATS:   'Seats Available',
-  COL_COST:    'Closing Cost',
+  COL_COURSE: 'Course Title',
+  COL_TERM: 'Term',          // e.g. "Fall 2023" — parsed into quarter + year
+  COL_PHASE: 'Phase',         // e.g. "Fall 2023 Bid Phase 1" — term prefix is stripped
+  COL_BIDS: 'Number of Bids',
+  COL_SEATS: 'Seats Available',
+  COL_COST: 'Closing Cost',
   COL_FACULTY: 'Faculty',       // e.g. "Cast, Carter" — flipped to "Carter Cast"
-  COL_CAMPUS:  'Campus',        // e.g. "Evanston", "Chicago"
+  COL_CAMPUS: 'Campus',        // e.g. "Evanston", "Chicago"
 
-  LIVES:        3,
+  LIVES: 3,
   CARDS_PER_GAME: 15,
   MIN_COST_SPREAD: 5,   // min unique cost values needed to start
 
@@ -40,59 +40,59 @@ const CONFIG = {
 /* ═══════════════════════════════════════════════════
    LOCAL STORAGE KEYS
    ═══════════════════════════════════════════════════ */
-const LS_ALLTIME_BEST   = 'bidtrivia_alltime_best_streak';
-const LS_LAST_STREAK    = 'bidtrivia_last_streak';
+const LS_ALLTIME_BEST = 'bidtrivia_alltime_best_streak';
+const LS_LAST_STREAK = 'bidtrivia_last_streak';
 
 /* ═══════════════════════════════════════════════════
    SAMPLE DATA  (fallback when CSV can't be loaded)
    ═══════════════════════════════════════════════════ */
 const SAMPLE_DATA = [
-  { course:"Business and the Natural Environment", term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Jane Smith",     campus:"Evanston", bids:22,  seats:40, cost:1   },
-  { course:"Ethics and Corporate Responsibility",  term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"John Doe",       campus:"Evanston", bids:18,  seats:35, cost:1   },
-  { course:"Management Communication",             term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 2", professor:"Alice Brown",    campus:"Chicago",  bids:12,  seats:30, cost:1   },
-  { course:"Global Initiatives in Management",     term:"Spring 2023", year:"2023", quarter:"Spring", phase:"Bid Phase 2", professor:"Bob Chen",    campus:"Evanston", bids:15,  seats:45, cost:2   },
-  { course:"Business Law",                         term:"Spring 2024", year:"2024", quarter:"Spring", phase:"Bid Phase 1", professor:"Mark McCareins", campus:"Evanston", bids:28,  seats:40, cost:8   },
-  { course:"Health Industry Management",           term:"Fall 2021", year:"2021", quarter:"Fall",   phase:"Bid Phase 2", professor:"Carol White",    campus:"Chicago",  bids:20,  seats:35, cost:12  },
-  { course:"Marketing Research",                   term:"Winter 2023", year:"2023", quarter:"Winter", phase:"Bid Phase 1", professor:"David Lee",   campus:"Evanston", bids:55,  seats:40, cost:18  },
-  { course:"Social Enterprise at Kellogg",         term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Emily Patel",   campus:"Evanston", bids:38,  seats:35, cost:25  },
-  { course:"Entrepreneurship Lab",                 term:"Spring 2022", year:"2022", quarter:"Spring", phase:"Bid Phase 2", professor:"Frank Garcia", campus:"Evanston", bids:42,  seats:30, cost:30  },
-  { course:"Digital Marketing",                    term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Grace Kim",     campus:"Evanston", bids:88,  seats:60, cost:35  },
-  { course:"Supply Chain Management",              term:"Winter 2024", year:"2024", quarter:"Winter", phase:"Bid Phase 1", professor:"Hank Jones",  campus:"Evanston", bids:65,  seats:50, cost:42  },
-  { course:"Financial Statement Analysis",         term:"Fall 2020", year:"2020", quarter:"Fall",   phase:"Bid Phase 1", professor:"Ivy Nguyen",    campus:"Evanston", bids:72,  seats:55, cost:48  },
-  { course:"Macroeconomic Policy",                 term:"Fall 2021", year:"2021", quarter:"Fall",   phase:"Bid Phase 1", professor:"Jack Turner",   campus:"Evanston", bids:55,  seats:50, cost:28  },
-  { course:"Executive Compensation",               term:"Spring 2022", year:"2022", quarter:"Spring", phase:"Bid Phase 1", professor:"Kate Lin",   campus:"Evanston", bids:48,  seats:30, cost:38  },
-  { course:"Design Thinking",                      term:"Winter 2024", year:"2024", quarter:"Winter", phase:"Bid Phase 1", professor:"Leo Adams",  campus:"Evanston", bids:95,  seats:40, cost:62  },
-  { course:"Corporate Strategy",                   term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Mia Scott",     campus:"Evanston", bids:90,  seats:55, cost:65  },
-  { course:"Leadership in Organizations",          term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Nate Brooks",   campus:"Evanston", bids:80,  seats:55, cost:55  },
-  { course:"Media and Entertainment Strategy",     term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Olivia Ray",    campus:"Chicago",  bids:98,  seats:40, cost:72  },
-  { course:"Consumer Behavior",                    term:"Winter 2023", year:"2023", quarter:"Winter", phase:"Bid Phase 1", professor:"Paul Rivera", campus:"Evanston", bids:100, seats:60, cost:78  },
-  { course:"Operations Management",                term:"Fall 2021", year:"2021", quarter:"Fall",   phase:"Bid Phase 1", professor:"Quinn Hall",    campus:"Evanston", bids:85,  seats:50, cost:88  },
-  { course:"Sports Business",                      term:"Spring 2024", year:"2024", quarter:"Spring", phase:"Bid Phase 1", professor:"Rita Voss",  campus:"Evanston", bids:110, seats:40, cost:88  },
-  { course:"Brand Management",                     term:"Spring 2024", year:"2024", quarter:"Spring", phase:"Bid Phase 1", professor:"Sam Ellis",  campus:"Evanston", bids:110, seats:55, cost:95  },
-  { course:"Mergers and Acquisitions",             term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Tina Wells",    campus:"Evanston", bids:125, seats:60, cost:112 },
-  { course:"Pricing Strategies",                   term:"Winter 2022", year:"2022", quarter:"Winter", phase:"Bid Phase 1", professor:"Uma Patel",  campus:"Evanston", bids:95,  seats:50, cost:118 },
-  { course:"Behavioral Finance",                   term:"Spring 2024", year:"2024", quarter:"Spring", phase:"Bid Phase 1", professor:"Vic Monroe", campus:"Evanston", bids:78,  seats:40, cost:132 },
-  { course:"Data Science for Marketing",           term:"Winter 2024", year:"2024", quarter:"Winter", phase:"Bid Phase 1", professor:"Wendy Cho",  campus:"Evanston", bids:130, seats:55, cost:135 },
-  { course:"Derivatives Markets",                  term:"Spring 2023", year:"2023", quarter:"Spring", phase:"Bid Phase 1", professor:"Xavier Ford", campus:"Evanston", bids:88,  seats:45, cost:142 },
-  { course:"Technology Strategy",                  term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Yara Singh",    campus:"Evanston", bids:122, seats:50, cost:148 },
-  { course:"Fixed Income",                         term:"Spring 2023", year:"2023", quarter:"Spring", phase:"Bid Phase 1", professor:"Zane Black", campus:"Evanston", bids:68,  seats:35, cost:155 },
-  { course:"Negotiations",                         term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Ann Cooper",    campus:"Evanston", bids:145, seats:60, cost:158 },
-  { course:"Real Estate Finance",                  term:"Winter 2023", year:"2023", quarter:"Winter", phase:"Bid Phase 1", professor:"Bill Drake", campus:"Evanston", bids:98,  seats:35, cost:178 },
-  { course:"Corporate Finance Lab",                term:"Spring 2022", year:"2022", quarter:"Spring", phase:"Bid Phase 1", professor:"Clara Dunn", campus:"Evanston", bids:75,  seats:30, cost:195 },
-  { course:"Innovation Lab",                       term:"Winter 2022", year:"2022", quarter:"Winter", phase:"Bid Phase 1", professor:"Dan Frost",  campus:"Evanston", bids:88,  seats:30, cost:195 },
-  { course:"Financial Modeling",                   term:"Winter 2023", year:"2023", quarter:"Winter", phase:"Bid Phase 1", professor:"Ella Grant", campus:"Evanston", bids:105, seats:40, cost:188 },
-  { course:"Investment Management",                term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Fred Hale",     campus:"Evanston", bids:160, seats:55, cost:210 },
-  { course:"Business Analytics",                   term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Gina Irwin",    campus:"Evanston", bids:175, seats:60, cost:228 },
-  { course:"Machine Learning for Finance",         term:"Spring 2023", year:"2023", quarter:"Spring", phase:"Bid Phase 1", professor:"Hugo James", campus:"Evanston", bids:115, seats:35, cost:235 },
-  { course:"Organizational Change",                term:"Winter 2024", year:"2024", quarter:"Winter", phase:"Bid Phase 1", professor:"Iris Kent",  campus:"Evanston", bids:105, seats:40, cost:245 },
-  { course:"Private Equity Finance",               term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Jake Lowe",     campus:"Evanston", bids:130, seats:30, cost:268 },
-  { course:"Trading and Markets",                  term:"Spring 2024", year:"2024", quarter:"Spring", phase:"Bid Phase 1", professor:"Kim Nash",   campus:"Evanston", bids:115, seats:35, cost:290 },
-  { course:"Venture Capital Lab",                  term:"Winter 2022", year:"2022", quarter:"Winter", phase:"Bid Phase 1", professor:"Liam Owen",  campus:"Evanston", bids:88,  seats:25, cost:315 },
-  { course:"Distressed Investing",                 term:"Fall 2021", year:"2021", quarter:"Fall",   phase:"Bid Phase 1", professor:"Mary Price",    campus:"Evanston", bids:75,  seats:20, cost:390 },
-  { course:"Hedge Funds & Alt Investments",        term:"Winter 2023", year:"2023", quarter:"Winter", phase:"Bid Phase 1", professor:"Nick Quinn", campus:"Evanston", bids:92,  seats:30, cost:342 },
-  { course:"Startup Lab",                          term:"Fall 2023", year:"2023", quarter:"Fall",   phase:"Bid Phase 1", professor:"Opal Reed",     campus:"Evanston", bids:145, seats:28, cost:378 },
-  { course:"Investment Banking Lab",               term:"Fall 2022", year:"2022", quarter:"Fall",   phase:"Bid Phase 1", professor:"Pete Shaw",     campus:"Evanston", bids:120, seats:25, cost:405 },
-  { course:"Private Equity Lab",                   term:"Winter 2024", year:"2024", quarter:"Winter", phase:"Bid Phase 1", professor:"Rose Todd",  campus:"Evanston", bids:150, seats:22, cost:448 },
+  { course: "Business and the Natural Environment", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Jane Smith", campus: "Evanston", bids: 22, seats: 40, cost: 1 },
+  { course: "Ethics and Corporate Responsibility", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "John Doe", campus: "Evanston", bids: 18, seats: 35, cost: 1 },
+  { course: "Management Communication", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 2", professor: "Alice Brown", campus: "Chicago", bids: 12, seats: 30, cost: 1 },
+  { course: "Global Initiatives in Management", term: "Spring 2023", year: "2023", quarter: "Spring", phase: "Bid Phase 2", professor: "Bob Chen", campus: "Evanston", bids: 15, seats: 45, cost: 2 },
+  { course: "Business Law", term: "Spring 2024", year: "2024", quarter: "Spring", phase: "Bid Phase 1", professor: "Mark McCareins", campus: "Evanston", bids: 28, seats: 40, cost: 8 },
+  { course: "Health Industry Management", term: "Fall 2021", year: "2021", quarter: "Fall", phase: "Bid Phase 2", professor: "Carol White", campus: "Chicago", bids: 20, seats: 35, cost: 12 },
+  { course: "Marketing Research", term: "Winter 2023", year: "2023", quarter: "Winter", phase: "Bid Phase 1", professor: "David Lee", campus: "Evanston", bids: 55, seats: 40, cost: 18 },
+  { course: "Social Enterprise at Kellogg", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Emily Patel", campus: "Evanston", bids: 38, seats: 35, cost: 25 },
+  { course: "Entrepreneurship Lab", term: "Spring 2022", year: "2022", quarter: "Spring", phase: "Bid Phase 2", professor: "Frank Garcia", campus: "Evanston", bids: 42, seats: 30, cost: 30 },
+  { course: "Digital Marketing", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Grace Kim", campus: "Evanston", bids: 88, seats: 60, cost: 35 },
+  { course: "Supply Chain Management", term: "Winter 2024", year: "2024", quarter: "Winter", phase: "Bid Phase 1", professor: "Hank Jones", campus: "Evanston", bids: 65, seats: 50, cost: 42 },
+  { course: "Financial Statement Analysis", term: "Fall 2020", year: "2020", quarter: "Fall", phase: "Bid Phase 1", professor: "Ivy Nguyen", campus: "Evanston", bids: 72, seats: 55, cost: 48 },
+  { course: "Macroeconomic Policy", term: "Fall 2021", year: "2021", quarter: "Fall", phase: "Bid Phase 1", professor: "Jack Turner", campus: "Evanston", bids: 55, seats: 50, cost: 28 },
+  { course: "Executive Compensation", term: "Spring 2022", year: "2022", quarter: "Spring", phase: "Bid Phase 1", professor: "Kate Lin", campus: "Evanston", bids: 48, seats: 30, cost: 38 },
+  { course: "Design Thinking", term: "Winter 2024", year: "2024", quarter: "Winter", phase: "Bid Phase 1", professor: "Leo Adams", campus: "Evanston", bids: 95, seats: 40, cost: 62 },
+  { course: "Corporate Strategy", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Mia Scott", campus: "Evanston", bids: 90, seats: 55, cost: 65 },
+  { course: "Leadership in Organizations", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Nate Brooks", campus: "Evanston", bids: 80, seats: 55, cost: 55 },
+  { course: "Media and Entertainment Strategy", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Olivia Ray", campus: "Chicago", bids: 98, seats: 40, cost: 72 },
+  { course: "Consumer Behavior", term: "Winter 2023", year: "2023", quarter: "Winter", phase: "Bid Phase 1", professor: "Paul Rivera", campus: "Evanston", bids: 100, seats: 60, cost: 78 },
+  { course: "Operations Management", term: "Fall 2021", year: "2021", quarter: "Fall", phase: "Bid Phase 1", professor: "Quinn Hall", campus: "Evanston", bids: 85, seats: 50, cost: 88 },
+  { course: "Sports Business", term: "Spring 2024", year: "2024", quarter: "Spring", phase: "Bid Phase 1", professor: "Rita Voss", campus: "Evanston", bids: 110, seats: 40, cost: 88 },
+  { course: "Brand Management", term: "Spring 2024", year: "2024", quarter: "Spring", phase: "Bid Phase 1", professor: "Sam Ellis", campus: "Evanston", bids: 110, seats: 55, cost: 95 },
+  { course: "Mergers and Acquisitions", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Tina Wells", campus: "Evanston", bids: 125, seats: 60, cost: 112 },
+  { course: "Pricing Strategies", term: "Winter 2022", year: "2022", quarter: "Winter", phase: "Bid Phase 1", professor: "Uma Patel", campus: "Evanston", bids: 95, seats: 50, cost: 118 },
+  { course: "Behavioral Finance", term: "Spring 2024", year: "2024", quarter: "Spring", phase: "Bid Phase 1", professor: "Vic Monroe", campus: "Evanston", bids: 78, seats: 40, cost: 132 },
+  { course: "Data Science for Marketing", term: "Winter 2024", year: "2024", quarter: "Winter", phase: "Bid Phase 1", professor: "Wendy Cho", campus: "Evanston", bids: 130, seats: 55, cost: 135 },
+  { course: "Derivatives Markets", term: "Spring 2023", year: "2023", quarter: "Spring", phase: "Bid Phase 1", professor: "Xavier Ford", campus: "Evanston", bids: 88, seats: 45, cost: 142 },
+  { course: "Technology Strategy", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Yara Singh", campus: "Evanston", bids: 122, seats: 50, cost: 148 },
+  { course: "Fixed Income", term: "Spring 2023", year: "2023", quarter: "Spring", phase: "Bid Phase 1", professor: "Zane Black", campus: "Evanston", bids: 68, seats: 35, cost: 155 },
+  { course: "Negotiations", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Ann Cooper", campus: "Evanston", bids: 145, seats: 60, cost: 158 },
+  { course: "Real Estate Finance", term: "Winter 2023", year: "2023", quarter: "Winter", phase: "Bid Phase 1", professor: "Bill Drake", campus: "Evanston", bids: 98, seats: 35, cost: 178 },
+  { course: "Corporate Finance Lab", term: "Spring 2022", year: "2022", quarter: "Spring", phase: "Bid Phase 1", professor: "Clara Dunn", campus: "Evanston", bids: 75, seats: 30, cost: 195 },
+  { course: "Innovation Lab", term: "Winter 2022", year: "2022", quarter: "Winter", phase: "Bid Phase 1", professor: "Dan Frost", campus: "Evanston", bids: 88, seats: 30, cost: 195 },
+  { course: "Financial Modeling", term: "Winter 2023", year: "2023", quarter: "Winter", phase: "Bid Phase 1", professor: "Ella Grant", campus: "Evanston", bids: 105, seats: 40, cost: 188 },
+  { course: "Investment Management", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Fred Hale", campus: "Evanston", bids: 160, seats: 55, cost: 210 },
+  { course: "Business Analytics", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Gina Irwin", campus: "Evanston", bids: 175, seats: 60, cost: 228 },
+  { course: "Machine Learning for Finance", term: "Spring 2023", year: "2023", quarter: "Spring", phase: "Bid Phase 1", professor: "Hugo James", campus: "Evanston", bids: 115, seats: 35, cost: 235 },
+  { course: "Organizational Change", term: "Winter 2024", year: "2024", quarter: "Winter", phase: "Bid Phase 1", professor: "Iris Kent", campus: "Evanston", bids: 105, seats: 40, cost: 245 },
+  { course: "Private Equity Finance", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Jake Lowe", campus: "Evanston", bids: 130, seats: 30, cost: 268 },
+  { course: "Trading and Markets", term: "Spring 2024", year: "2024", quarter: "Spring", phase: "Bid Phase 1", professor: "Kim Nash", campus: "Evanston", bids: 115, seats: 35, cost: 290 },
+  { course: "Venture Capital Lab", term: "Winter 2022", year: "2022", quarter: "Winter", phase: "Bid Phase 1", professor: "Liam Owen", campus: "Evanston", bids: 88, seats: 25, cost: 315 },
+  { course: "Distressed Investing", term: "Fall 2021", year: "2021", quarter: "Fall", phase: "Bid Phase 1", professor: "Mary Price", campus: "Evanston", bids: 75, seats: 20, cost: 390 },
+  { course: "Hedge Funds & Alt Investments", term: "Winter 2023", year: "2023", quarter: "Winter", phase: "Bid Phase 1", professor: "Nick Quinn", campus: "Evanston", bids: 92, seats: 30, cost: 342 },
+  { course: "Startup Lab", term: "Fall 2023", year: "2023", quarter: "Fall", phase: "Bid Phase 1", professor: "Opal Reed", campus: "Evanston", bids: 145, seats: 28, cost: 378 },
+  { course: "Investment Banking Lab", term: "Fall 2022", year: "2022", quarter: "Fall", phase: "Bid Phase 1", professor: "Pete Shaw", campus: "Evanston", bids: 120, seats: 25, cost: 405 },
+  { course: "Private Equity Lab", term: "Winter 2024", year: "2024", quarter: "Winter", phase: "Bid Phase 1", professor: "Rose Todd", campus: "Evanston", bids: 150, seats: 22, cost: 448 },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -119,24 +119,119 @@ function initFirebase() {
    STATE
    ═══════════════════════════════════════════════════ */
 let state = {
-  allData:     [],
-  deck:        [],    // cards for this game session
-  timeline:    [],    // placed cards (sorted by cost)
-  cardIndex:   0,     // next card to show from deck
-  lives:       CONFIG.LIVES,
-  score:       0,
-  streak:      0,
-  bestStreak:  0,
+  allData: [],
+  deck: [],    // cards for this game session
+  timeline: [],    // placed cards (sorted by cost)
+  cardIndex: 0,     // next card to show from deck
+  lives: CONFIG.LIVES,
+  score: 0,
+  streak: 0,
+  bestStreak: 0,
   cardsAttempted: 0,
   isAnimating: false,
-  dragging:    false,
-  clickMode:   false, // true = card is "picked up", waiting for slot click
+  dragging: false,
+  clickMode: false, // true = card is "picked up", waiting for slot click
 
   // Leaderboard / session tracking
-  gameStartTime:    null,  // Date object set when game starts
-  scoreSubmitted:   false, // prevent double-submit
-  activeLbPeriod:   'week',
+  gameStartTime: null,  // Date object set when game starts
+  scoreSubmitted: false, // prevent double-submit
+  activeLbPeriod: 'week',
 };
+
+/* ═══════════════════════════════════════════════════
+   MEETING PATTERN PARSER
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * Parse the "Meeting Pattern" field from the Kellogg bid data into a compact
+ * human-readable schedule string like "Tue 6:30–9:30" or "Mon / Thu 10:30–12:00".
+ *
+ * The field has two possible shapes:
+ *   Simple:  "Tue 6:30PM - 9:30PM"
+ *   Dated:   "Tue 09/19/2023 6:00PM - 9:00PM<br/>Tue 09/26/2023 6:00PM - 9:00PM<br/>..."
+ *
+ * Output examples:
+ *   "Tue 6:30–9:30"           (single day, same time every week)
+ *   "Mon / Thu 8:30–10:00"    (two days, same time)
+ *   "Mon 6:30–9:30"           (evening section)
+ */
+function parseMeetingPattern(raw) {
+  if (!raw) return '';
+
+  // Normalise: split on <br/> (or <br>) to get individual session strings
+  const sessions = raw
+    .split(/<br\s*\/?>/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Day name abbreviations we recognise
+  const DAY_RE = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/;
+  // Optional date segment: "09/19/2023 " — we want to strip it
+  const DATE_SEG_RE = /\d{2}\/\d{2}\/\d{4}\s+/;
+  // Time range: "6:00PM - 9:00PM" or "6:30PM - 9:30PM"
+  const TIME_RANGE_RE = /(\d{1,2}:\d{2})(AM|PM)\s*-\s*(\d{1,2}:\d{2})(AM|PM)/i;
+
+  /**
+   * Convert "6:00PM" → "6:00", stripping :00 minutes when both sides do it.
+   * We keep minutes so the caller can decide to strip trailing :00.
+   */
+  function fmtTime(h, m, period) {
+    // Convert to 12-hour display — Kellogg already uses 12h, just strip AM/PM
+    // and the period context (AM vs PM is obvious from the hour value).
+    // We show PM hours as-is (6:30, 9:30) and AM hours as-is (8:30, 10:30).
+    return `${h}:${m}`;
+  }
+
+  // Collect unique (day, startH, startM, endH, endM) tuples
+  const seen = new Set();
+  const entries = [];
+
+  for (const session of sessions) {
+    const dayMatch = session.match(DAY_RE);
+    if (!dayMatch) continue;
+    const day = dayMatch[1];
+
+    // Strip the date segment if present, then look for the time range
+    const withoutDate = session.replace(DATE_SEG_RE, '');
+    const timeMatch = withoutDate.match(TIME_RANGE_RE);
+    if (!timeMatch) continue;
+
+    const [, startHM,, endHM] = timeMatch;
+    const [startH, startM] = startHM.split(':');
+    const [endH, endM] = endHM.split(':');
+    const key = `${day}|${startH}:${startM}|${endH}:${endM}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push({ day, startH, startM, endH, endM });
+    }
+  }
+
+  if (entries.length === 0) return '';
+
+  // Group by time range so we can combine multi-day sections
+  // e.g. Mon 8:30-10:00 + Thu 8:30-10:00  → "Mon / Thu 8:30–10:00"
+  const byTime = {};
+  for (const e of entries) {
+    const timeKey = `${e.startH}:${e.startM}|${e.endH}:${e.endM}`;
+    if (!byTime[timeKey]) byTime[timeKey] = { startH: e.startH, startM: e.startM, endH: e.endH, endM: e.endM, days: [] };
+    byTime[timeKey].days.push(e.day);
+  }
+
+  // Format each unique time range
+  function trimMin(h, m) {
+    // Drop ":00" if both start and end minutes are "00" — keep if non-zero
+    return m === '00' ? h : `${h}:${m}`;
+  }
+
+  const parts = Object.values(byTime).map(({ startH, startM, endH, endM, days }) => {
+    const start = trimMin(startH, startM);
+    const end = trimMin(endH, endM);
+    const dayStr = days.join(' / ');
+    return `${dayStr} ${start}–${end}`;
+  });
+
+  return parts.join(', ');
+}
 
 /* ═══════════════════════════════════════════════════
    CSV PARSING
@@ -148,14 +243,14 @@ function mapCSVRow(row) {
   if (isNaN(cost) || cost <= 0) return null;
 
   // Term is "Fall 2023", "Winter 2024", etc. — split into quarter + year
-  const termRaw  = (row[CONFIG.COL_TERM] || '').trim();
+  const termRaw = (row[CONFIG.COL_TERM] || '').trim();
   const termMatch = termRaw.match(/^(\S+)\s+(\d{4})$/);
-  const quarter  = termMatch ? termMatch[1] : termRaw;
-  const year     = termMatch ? termMatch[2] : '';
+  const quarter = termMatch ? termMatch[1] : termRaw;
+  const year = termMatch ? termMatch[2] : '';
 
   // Phase is "Fall 2023 Bid Phase 1" — strip the leading "<Term> " prefix
   const phaseRaw = (row[CONFIG.COL_PHASE] || '').trim();
-  const phase    = phaseRaw.startsWith(termRaw)
+  const phase = phaseRaw.startsWith(termRaw)
     ? phaseRaw.slice(termRaw.length).trim()
     : phaseRaw;
 
@@ -170,16 +265,20 @@ function mapCSVRow(row) {
   // Campus
   const campus = (row[CONFIG.COL_CAMPUS] || '').trim();
 
+  // Meeting Pattern → compact schedule string
+  const schedule = parseMeetingPattern(row['Meeting Pattern'] || '');
+
   return {
-    course:  row[CONFIG.COL_COURSE]  || 'Unknown',
-    term:    termRaw,   // combined "Fall 2023" for display
+    course: row[CONFIG.COL_COURSE] || 'Unknown',
+    term: termRaw,   // combined "Fall 2023" for display
     year,
     quarter,
     phase,
     professor,
     campus,
-    bids:    parseInt(row[CONFIG.COL_BIDS])  || 0,
-    seats:   parseInt(row[CONFIG.COL_SEATS]) || 0,
+    schedule,
+    bids: parseInt(row[CONFIG.COL_BIDS]) || 0,
+    seats: parseInt(row[CONFIG.COL_SEATS]) || 0,
     cost,
   };
 }
@@ -230,18 +329,18 @@ async function startGame() {
 
   // Reset state
   const deck = buildDeck();
-  state.deck           = deck.slice(1); // remaining cards
-  state.timeline       = [deck[0]];     // anchor — first card placed automatically
-  state.cardIndex      = 0;
-  state.lives          = CONFIG.LIVES;
-  state.score          = 0;
-  state.streak         = 0;
-  state.bestStreak     = 0;
+  state.deck = deck.slice(1); // remaining cards
+  state.timeline = [deck[0]];     // anchor — first card placed automatically
+  state.cardIndex = 0;
+  state.lives = CONFIG.LIVES;
+  state.score = 0;
+  state.streak = 0;
+  state.bestStreak = 0;
   state.cardsAttempted = 0;
-  state.isAnimating    = false;
-  state.clickMode      = false;
+  state.isAnimating = false;
+  state.clickMode = false;
   state.scoreSubmitted = false;
-  state.gameStartTime  = new Date();    // record start time for leaderboard
+  state.gameStartTime = new Date();    // record start time for leaderboard
 
   renderAll();
   scrollTimelineToCenter();
@@ -262,8 +361,8 @@ function activeCard() {
 /** Returns true if slotIndex is a valid position for cost in the current timeline */
 function isCorrectPlacement(slotIndex, cost) {
   const tl = state.timeline;
-  const leftCost  = slotIndex > 0           ? tl[slotIndex - 1].cost : -Infinity;
-  const rightCost = slotIndex < tl.length   ? tl[slotIndex].cost     :  Infinity;
+  const leftCost = slotIndex > 0 ? tl[slotIndex - 1].cost : -Infinity;
+  const rightCost = slotIndex < tl.length ? tl[slotIndex].cost : Infinity;
   return leftCost <= cost && cost <= rightCost;
 }
 
@@ -271,8 +370,8 @@ function isCorrectPlacement(slotIndex, cost) {
 function findCorrectSlot(cost) {
   const tl = state.timeline;
   for (let i = 0; i <= tl.length; i++) {
-    const left  = i > 0          ? tl[i - 1].cost : -Infinity;
-    const right = i < tl.length  ? tl[i].cost     :  Infinity;
+    const left = i > 0 ? tl[i - 1].cost : -Infinity;
+    const right = i < tl.length ? tl[i].cost : Infinity;
     if (left <= cost && cost <= right) return i;
   }
   return tl.length;
@@ -329,7 +428,7 @@ async function handlePlacement(slotIndex, placementOrigin = null) {
 
     // Fly the card from where it was picked up/released to the correct slot.
     const correctSlot = findCorrectSlot(card.cost);
-    const newCardEl   = insertAndAnimate(card, correctSlot, placementOrigin);
+    const newCardEl = insertAndAnimate(card, correctSlot, placementOrigin);
     renderStats();
     if (newCardEl) newCardEl.classList.add('card--wrong');
     showToast(`❌ It cost ${card.cost} pts — placing it correctly`, 'wrong');
@@ -394,7 +493,7 @@ function getCardAnimationKey(card) {
  */
 function insertAndAnimate(card, slotIndex, flyFromRect) {
   // ── 1. Snapshot “before” screen positions of all placed cards ───────────
-  const beforeEls   = [...document.querySelectorAll('#timeline .card--placed')];
+  const beforeEls = [...document.querySelectorAll('#timeline .card--placed')];
   const beforeRects = new Map();
   beforeEls.forEach(el => beforeRects.set(getCardKey(el), el.getBoundingClientRect()));
 
@@ -403,7 +502,7 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
   let originRect = flyFromRect ?? null;
   if (!originRect) {
     const activeEl = document.getElementById('active-card');
-    originRect     = activeEl?.getBoundingClientRect() ?? null;
+    originRect = activeEl?.getBoundingClientRect() ?? null;
   }
 
   // ── 2. Mutate state + rebuild DOM ──────────────────────────────────
@@ -412,10 +511,10 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
 
   // ── 3. Animate ───────────────────────────────────────────────────
   const afterEls = [...document.querySelectorAll('#timeline .card--placed')];
-  let newCardEl  = null;
+  let newCardEl = null;
 
   afterEls.forEach(el => {
-    const key       = getCardKey(el);
+    const key = getCardKey(el);
     const afterRect = el.getBoundingClientRect();
 
     if (!beforeRects.has(key)) {
@@ -426,29 +525,29 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
 
       if (originRect) {
         // Vector from this card’s centre to the active card’s centre
-        dx    = (originRect.left + originRect.width  / 2)
-              - (afterRect.left  + afterRect.width   / 2);
-        dy    = (originRect.top  + originRect.height / 2)
-              - (afterRect.top   + afterRect.height  / 2);
+        dx = (originRect.left + originRect.width / 2)
+          - (afterRect.left + afterRect.width / 2);
+        dy = (originRect.top + originRect.height / 2)
+          - (afterRect.top + afterRect.height / 2);
       }
 
       // Stamp the card at its “before” transform instantly (no transition)
       // The moving card already uses timeline dimensions, so only its position
       // changes. Scaling here would stretch the text and create a morph effect.
-      el.style.transform  = `translate(${dx}px, ${dy}px)`;
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
       el.style.transition = 'none';
-      el.style.zIndex     = '10';
+      el.style.zIndex = '10';
       el.style.willChange = 'transform';
 
       // Double rAF: first frame paints the “before” state, second kicks off transition
       requestAnimationFrame(() => requestAnimationFrame(() => {
         el.style.transition = 'transform 0.46s cubic-bezier(0.22, 1, 0.36, 1)';
-        el.style.transform  = '';
+        el.style.transform = '';
 
         // Clean up after animation completes
         setTimeout(() => {
           el.style.transition = '';
-          el.style.zIndex     = '';
+          el.style.zIndex = '';
           el.style.willChange = '';
         }, 550);
       }));
@@ -457,16 +556,16 @@ function insertAndAnimate(card, slotIndex, flyFromRect) {
       // ─ Existing card: FLIP to new position if it moved ───────────
       const beforeRect = beforeRects.get(key);
       const dx = beforeRect.left - afterRect.left;
-      const dy = beforeRect.top  - afterRect.top;
+      const dy = beforeRect.top - afterRect.top;
 
       if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-        el.style.transform  = `translate(${dx}px, ${dy}px)`;
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
         el.style.transition = 'none';
         el.style.willChange = 'transform';
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
           el.style.transition = 'transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)';
-          el.style.transform  = '';
+          el.style.transform = '';
 
           setTimeout(() => {
             el.style.transition = '';
@@ -494,9 +593,9 @@ function advanceCard() {
 
 function streakMessage(streak) {
   if (streak >= 10) return `🔥 ${streak} streak!! Unreal!`;
-  if (streak >= 7)  return `🔥 ${streak} in a row! On fire!`;
-  if (streak >= 5)  return `🔥 ${streak} in a row!`;
-  if (streak >= 3)  return `✅ ${streak} streak!`;
+  if (streak >= 7) return `🔥 ${streak} in a row! On fire!`;
+  if (streak >= 5) return `🔥 ${streak} in a row!`;
+  if (streak >= 3) return `✅ ${streak} streak!`;
   return '✅ Correct!';
 }
 
@@ -508,16 +607,16 @@ function showResults(won = false) {
   document.getElementById('results-screen').classList.add('active');
 
   // ── Header ──────────────────────────────────────
-  document.getElementById('results-emoji').textContent  = won ? '🏆' : '💀';
-  document.getElementById('results-title').textContent  = won ? 'Deck Complete!' : 'Game Over';
-  document.getElementById('results-sub').textContent    = won
+  document.getElementById('results-emoji').textContent = won ? '🏆' : '💀';
+  document.getElementById('results-title').textContent = won ? 'Deck Complete!' : 'Game Over';
+  document.getElementById('results-sub').textContent = won
     ? `You placed all ${state.score} cards correctly!`
     : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
 
   // ── Score stats ─────────────────────────────────
-  document.getElementById('final-score').textContent    = state.score;
-  document.getElementById('final-streak').textContent   = state.bestStreak;
-  document.getElementById('final-cards').textContent    = state.cardsAttempted;
+  document.getElementById('final-score').textContent = state.score;
+  document.getElementById('final-streak').textContent = state.bestStreak;
+  document.getElementById('final-cards').textContent = state.cardsAttempted;
 
   const accuracy = state.cardsAttempted > 0
     ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
@@ -525,9 +624,9 @@ function showResults(won = false) {
 
   // ── Personal best (localStorage) ────────────────
   const prevBest = parseInt(localStorage.getItem(LS_ALLTIME_BEST) || '0', 10);
-  const newBest  = Math.max(prevBest, state.bestStreak);
+  const newBest = Math.max(prevBest, state.bestStreak);
   localStorage.setItem(LS_ALLTIME_BEST, newBest);
-  localStorage.setItem(LS_LAST_STREAK,  state.bestStreak);
+  localStorage.setItem(LS_LAST_STREAK, state.bestStreak);
 
   document.getElementById('ps-this-streak').textContent = state.bestStreak;
   document.getElementById('ps-best-streak').textContent = newBest;
@@ -575,7 +674,7 @@ async function handleShareResult() {
     `Score: ${state.score}/${state.cardsAttempted} · Streak: ${state.bestStreak} · Accuracy: ${accuracy}%`,
     ``,
     `Think you know the Kellogg bid market better?`,
-    `Play → kelloggbidpoints.com`,
+    `kelloggbidpoints.com`,
   ];
   const shareText = lines.join('\n');
 
@@ -627,7 +726,7 @@ async function copyToClipboard(text, btn) {
    LEADERBOARD — LOCAL STORAGE BANNER (start screen)
    ═══════════════════════════════════════════════════ */
 function updatePersonalBestBanner() {
-  const lastStreak  = localStorage.getItem(LS_LAST_STREAK);
+  const lastStreak = localStorage.getItem(LS_LAST_STREAK);
   const alltimeBest = localStorage.getItem(LS_ALLTIME_BEST);
   const banner = document.getElementById('personal-best-banner');
   if (!lastStreak && !alltimeBest) {
@@ -635,7 +734,7 @@ function updatePersonalBestBanner() {
     return;
   }
   banner.style.display = '';
-  document.getElementById('pb-last-streak').textContent   = lastStreak  || '—';
+  document.getElementById('pb-last-streak').textContent = lastStreak || '—';
   document.getElementById('pb-alltime-streak').textContent = alltimeBest || '—';
 }
 
@@ -645,21 +744,21 @@ function updatePersonalBestBanner() {
 async function handleSubmitScore() {
   if (state.scoreSubmitted) return;
 
-  const nameInput  = document.getElementById('player-name-input');
-  const statusEl   = document.getElementById('submit-status');
-  const submitBtn  = document.getElementById('submit-score-btn');
-  const name       = nameInput.value.trim();
+  const nameInput = document.getElementById('player-name-input');
+  const statusEl = document.getElementById('submit-status');
+  const submitBtn = document.getElementById('submit-score-btn');
+  const name = nameInput.value.trim();
 
   if (!name) {
     statusEl.textContent = 'Please enter your name first.';
-    statusEl.className   = 'submit-status error';
+    statusEl.className = 'submit-status error';
     nameInput.focus();
     return;
   }
 
   if (!db) {
     statusEl.textContent = 'Leaderboard unavailable (no Firebase connection).';
-    statusEl.className   = 'submit-status error';
+    statusEl.className = 'submit-status error';
     return;
   }
 
@@ -678,33 +777,33 @@ async function handleSubmitScore() {
 
   const payload = {
     name,
-    score:          state.score,
-    bestStreak:     state.bestStreak,
+    score: state.score,
+    bestStreak: state.bestStreak,
     accuracy,
     cardsAttempted: state.cardsAttempted,
     elapsedSeconds,
-    playedAt:       firebase.firestore.FieldValue.serverTimestamp(),
+    playedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   // Disable UI during submit
-  submitBtn.disabled  = true;
-  nameInput.disabled  = true;
+  submitBtn.disabled = true;
+  nameInput.disabled = true;
   statusEl.textContent = 'Saving…';
-  statusEl.className   = 'submit-status saving';
+  statusEl.className = 'submit-status saving';
 
   try {
     await db.collection('bidtrivia_leaderboard').doc(docId).set(payload);
     state.scoreSubmitted = true;
     statusEl.textContent = '✅ Score saved! See if you made the top 10.';
-    statusEl.className   = 'submit-status success';
+    statusEl.className = 'submit-status success';
     // Refresh the currently visible leaderboard
     fetchLeaderboard(state.activeLbPeriod);
   } catch (err) {
     console.error('BidTrivia: score submit failed', err);
     statusEl.textContent = '❌ Could not save — check your connection.';
-    statusEl.className   = 'submit-status error';
-    submitBtn.disabled   = false;
-    nameInput.disabled   = false;
+    statusEl.className = 'submit-status error';
+    submitBtn.disabled = false;
+    nameInput.disabled = false;
   }
 }
 
@@ -715,9 +814,9 @@ function getPeriodStart(period) {
   const now = new Date();
   if (period === 'week') {
     // Monday of current week
-    const day  = now.getDay();               // 0 = Sun
+    const day = now.getDay();               // 0 = Sun
     const diff = (day === 0 ? -6 : 1 - day); // days back to Monday
-    const mon  = new Date(now);
+    const mon = new Date(now);
     mon.setDate(now.getDate() + diff);
     mon.setHours(0, 0, 0, 0);
     return mon;
@@ -797,11 +896,11 @@ function renderLeaderboard(entries, period, listElId = 'lb-list') {
   const medals = ['🥇', '🥈', '🥉'];
 
   listEl.innerHTML = entries.map((entry, i) => {
-    const rank        = i + 1;
+    const rank = i + 1;
     const rankDisplay = medals[i] || `<span class="lb-rank-num">${rank}</span>`;
-    const accuracy    = entry.accuracy != null ? `${entry.accuracy}%` : '—';
-    const streak      = entry.bestStreak != null ? `🔥${entry.bestStreak}` : '';
-    const elapsed     = entry.elapsedSeconds != null ? formatElapsed(entry.elapsedSeconds) : '';
+    const accuracy = entry.accuracy != null ? `${entry.accuracy}%` : '—';
+    const streak = entry.bestStreak != null ? `🔥${entry.bestStreak}` : '';
+    const elapsed = entry.elapsedSeconds != null ? formatElapsed(entry.elapsedSeconds) : '';
 
     return `
       <div class="lb-row ${rank <= 3 ? 'lb-row--top' : ''}" style="animation-delay:${i * 60}ms">
@@ -824,9 +923,9 @@ function switchLeaderboardTab(period) {
 }
 
 function setActiveTab(period) {
-  document.getElementById('lb-tab-week').classList.toggle('active',  period === 'week');
+  document.getElementById('lb-tab-week').classList.toggle('active', period === 'week');
   document.getElementById('lb-tab-month').classList.toggle('active', period === 'month');
-  document.getElementById('lb-tab-week').setAttribute('aria-selected',  period === 'week');
+  document.getElementById('lb-tab-week').setAttribute('aria-selected', period === 'week');
   document.getElementById('lb-tab-month').setAttribute('aria-selected', period === 'month');
 }
 
@@ -836,9 +935,9 @@ let startLbPeriod = 'week';
 function switchStartLeaderboardTab(period) {
   if (period === startLbPeriod) return;
   startLbPeriod = period;
-  document.getElementById('start-lb-tab-week').classList.toggle('active',  period === 'week');
+  document.getElementById('start-lb-tab-week').classList.toggle('active', period === 'week');
   document.getElementById('start-lb-tab-month').classList.toggle('active', period === 'month');
-  document.getElementById('start-lb-tab-week').setAttribute('aria-selected',  period === 'week');
+  document.getElementById('start-lb-tab-week').setAttribute('aria-selected', period === 'week');
   document.getElementById('start-lb-tab-month').setAttribute('aria-selected', period === 'month');
   fetchLeaderboard(period, 'start-lb-list');
 }
@@ -871,12 +970,12 @@ function renderLives() {
 
 function renderStats() {
   document.getElementById('streak-display').textContent = state.streak;
-  document.getElementById('score-display').textContent  = state.score;
+  document.getElementById('score-display').textContent = state.score;
   renderLives();
 }
 
 function renderProgress() {
-  const total   = state.deck.length;
+  const total = state.deck.length;
   const current = state.cardIndex + 1;
   document.getElementById('progress-text').textContent =
     `Card ${Math.min(current, total)} of ${total}`;
@@ -886,14 +985,31 @@ function renderActiveCard() {
   const card = activeCard();
   if (!card) return;
   setActiveCardHidden(false);
-  document.getElementById('active-course').textContent    = card.course;
+  document.getElementById('active-course').textContent = card.course;
   document.getElementById('active-professor').textContent = card.professor || '';
-  document.getElementById('active-campus').textContent    = card.campus || '';
+  // Campus + schedule inline
+  const campusEl = document.getElementById('active-campus');
+  campusEl.textContent = '';
+  if (card.campus) {
+    const campusSpan = document.createElement('span');
+    campusSpan.textContent = card.campus;
+    campusEl.appendChild(campusSpan);
+    if (card.schedule) {
+      const sep = document.createElement('span');
+      sep.className = 'card-schedule-sep';
+      sep.textContent = ' · ';
+      campusEl.appendChild(sep);
+      const schedSpan = document.createElement('span');
+      schedSpan.className = 'card-schedule';
+      schedSpan.textContent = card.schedule;
+      campusEl.appendChild(schedSpan);
+    }
+  }
   // Combine term and phase on one line
   const termPhase = [card.term, card.phase].filter(Boolean).join(' · ');
   document.getElementById('active-term-phase').textContent = termPhase;
-  document.getElementById('active-bids').textContent      = card.bids.toLocaleString();
-  document.getElementById('active-seats').textContent     = card.seats.toLocaleString();
+  document.getElementById('active-bids').textContent = card.bids.toLocaleString();
+  document.getElementById('active-seats').textContent = card.seats.toLocaleString();
 }
 
 function phaseBadgeClass(phase) {
@@ -963,10 +1079,15 @@ function createPlacedCard(card, revealCost = true) {
   el.dataset.animationKey = getCardAnimationKey(card);
 
   const termPhase = [card.term, card.phase].filter(Boolean).join(' · ');
+  const campusLine = card.campus
+    ? (card.schedule
+        ? `${card.campus}<span class="card-schedule-sep"> · </span><span class="card-schedule">${card.schedule}</span>`
+        : card.campus)
+    : '';
   el.innerHTML = `
     <div class="card-course-name">${card.course}</div>
     ${card.professor ? `<div class="card-professor">${card.professor}</div>` : ''}
-    ${card.campus ? `<div class="card-campus">${card.campus}</div>` : ''}
+    ${campusLine ? `<div class="card-campus">${campusLine}</div>` : ''}
     <div class="card-term-phase">${termPhase}</div>
     <div class="cost-reveal${revealCost ? '' : ' cost-reveal--hidden'}">
       <div class="cost-reveal-label">Cost</div>
