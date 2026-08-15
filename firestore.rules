@@ -7,14 +7,18 @@ service cloud.firestore {
 
     // ── BidTrivia Public Leaderboard ─────────────────────────────────────────
     // Public game — anyone can read scores and submit their own score.
-    // Write is restricted to creating new documents only (no editing old ones).
+    // Documents are created at game start, then updated at game end and when
+    // the player submits their name — so both create and update must be allowed.
     match /bidtrivia_leaderboard/{docId} {
       // Anyone can read the leaderboard
       allow read: if true;
 
-      // Anyone can create a new score document
-      // (no update/delete — players can't overwrite others' scores)
+      // Create: game session document is initialised when a game starts
       allow create: if true;
+
+      // Update: document is patched when the game ends (score fields) and
+      // again when the player submits their name. Delete is not permitted.
+      allow update: if true;
     }
 
     // ── Default: deny everything else ────────────────────────────────────────
