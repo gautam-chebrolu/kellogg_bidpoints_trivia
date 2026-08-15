@@ -753,7 +753,8 @@ function updatePersonalBestBanner() {
 
 /**
  * Called at the start of each game. Creates a Firestore document immediately
- * so every session is recorded regardless of whether the player submits a name.
+ * with all fields pre-initialized so every session is recorded regardless of
+ * whether the player finishes or submits a name.
  */
 async function createGameDocument() {
   if (!db) return;
@@ -761,9 +762,15 @@ async function createGameDocument() {
     const docId = state.gameStartTime.toISOString();
     const ref = db.collection('bidtrivia_leaderboard').doc(docId);
     await ref.set({
+      accuracy: null,
+      bestStreak: null,
+      cardsAttempted: null,
+      elapsedSeconds: null,
+      endedAt: null,
       name: '',
-      status: 'in_progress',
+      score: null,
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'in_progress',
     });
     state.activeDocRef = ref;
   } catch (err) {
@@ -785,13 +792,13 @@ async function updateGameDocument(won) {
       ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
 
     await state.activeDocRef.update({
-      status: won ? 'won' : 'lost',
-      score: state.score,
-      bestStreak: state.bestStreak,
       accuracy,
+      bestStreak: state.bestStreak,
       cardsAttempted: state.cardsAttempted,
       elapsedSeconds,
-      playedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      endedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      score: state.score,
+      status: won ? 'won' : 'lost',
     });
   } catch (err) {
     console.warn('BidTrivia: could not update game document —', err.message);
@@ -845,14 +852,15 @@ async function handleSubmitScore() {
         ? state.gameStartTime.toISOString()
         : new Date().toISOString();
       await db.collection('bidtrivia_leaderboard').doc(docId).set({
-        name,
-        status: 'submitted',
-        score: state.score,
-        bestStreak: state.bestStreak,
         accuracy,
+        bestStreak: state.bestStreak,
         cardsAttempted: state.cardsAttempted,
         elapsedSeconds,
-        playedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        endedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        name,
+        score: state.score,
+        startedAt: null,
+        status: 'submitted',
       });
     }
     state.scoreSubmitted = true;
@@ -905,8 +913,8 @@ async function fetchLeaderboard(period, listElId = 'lb-list') {
     const periodStart = getPeriodStart(period);
 
     let query = db.collection('bidtrivia_leaderboard')
-      .where('playedAt', '>=', periodStart)
-      .orderBy('playedAt', 'asc'); // secondary: recency (playedAt asc = needed for compound index)
+      .where('endedAt', '>=', periodStart)
+      .orderBy('endedAt', 'asc'); // secondary: recency (endedAt asc = needed for compound index)
 
     // We need to order by score desc — Firestore requires the inequality field first,
     // so we fetch a larger set, sort client-side, and slice top N.
