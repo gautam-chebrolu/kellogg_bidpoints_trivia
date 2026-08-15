@@ -207,6 +207,17 @@ function parseMeetingPattern(raw) {
     }
   }
 
+  // Canonical week order for sorting days
+  const DAY_ORDER = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+
+  // Standard Kellogg two-day partner pairs.
+  // If a time slot's days include both members of a pair, keep only those two
+  // and discard any other days (makeup / one-off sessions).
+  const PARTNER_PAIRS = [
+    new Set(['Mon', 'Thu']),
+    new Set(['Tue', 'Fri']),
+  ];
+
   if (entries.length === 0) return '';
 
   // Group by time range so we can combine multi-day sections
@@ -225,9 +236,23 @@ function parseMeetingPattern(raw) {
   }
 
   const parts = Object.values(byTime).map(({ startH, startM, endH, endM, days }) => {
+    // ── 1. Partner-pair filtering ───────────────────────────────────────────
+    // If days include both halves of a known pair (e.g. Mon+Thu), keep only
+    // those two and drop any extras (makeup sessions on other days).
+    let filteredDays = days;
+    for (const pair of PARTNER_PAIRS) {
+      if (days.every(d => pair.has(d)) === false && [...pair].every(d => days.includes(d))) {
+        filteredDays = [...pair];
+        break;
+      }
+    }
+
+    // ── 2. Sort in canonical Mon→Sun order ──────────────────────────────────
+    filteredDays = [...filteredDays].sort((a, b) => DAY_ORDER[a] - DAY_ORDER[b]);
+
     const start = trimMin(startH, startM);
     const end = trimMin(endH, endM);
-    const dayStr = days.join(' / ');
+    const dayStr = filteredDays.join(' / ');
     return `${dayStr} ${start}–${end}`;
   });
 
