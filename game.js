@@ -134,6 +134,7 @@ let state = {
 
   // Leaderboard / session tracking
   gameStartTime: null,  // Date object set when game starts
+  activeDocRef: null,   // Firestore DocumentReference for the current game
   scoreSubmitted: false, // prevent double-submit
   activeLbPeriod: 'week',
 };
@@ -340,7 +341,12 @@ async function startGame() {
   state.isAnimating = false;
   state.clickMode = false;
   state.scoreSubmitted = false;
+  state.activeDocRef = null;
   state.gameStartTime = new Date();    // record start time for leaderboard
+
+  // Create a Firestore document immediately so every game session is tracked,
+  // even if the player never submits their name at the end.
+  createGameDocument();
 
   renderAll();
   scrollTimelineToCenter();
@@ -606,6 +612,9 @@ function showResults(won = false) {
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('results-screen').classList.add('active');
 
+  // Persist final score data to the game document created at start
+  updateGameDocument(won);
+
   // ── Header ──────────────────────────────────────
   document.getElementById('results-emoji').textContent = won ? '🏆' : '💀';
   document.getElementById('results-title').textContent = won ? 'Deck Complete!' : 'Game Over';
@@ -739,6 +748,57 @@ function updatePersonalBestBanner() {
 }
 
 /* ═══════════════════════════════════════════════════
+   LEADERBOARD — FIRESTORE DOCUMENT LIFECYCLE
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * Called at the start of each game. Creates a Firestore document immediately
+ * so every session is recorded regardless of whether the player submits a name.
+ */
+async function createGameDocument() {
+  if (!db) return;
+  try {
+    const docId = state.gameStartTime.toISOString();
+    const ref = db.collection('bidtrivia_leaderboard').doc(docId);
+    await ref.set({
+      name: '',
+      status: 'in_progress',
+      startedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    state.activeDocRef = ref;
+  } catch (err) {
+    console.warn('BidTrivia: could not create game document —', err.message);
+  }
+}
+
+/**
+ * Called when the game ends (win or loss). Updates the existing document with
+ * final score data. Name remains blank until the player submits it.
+ */
+async function updateGameDocument(won) {
+  if (!db || !state.activeDocRef) return;
+  try {
+    const elapsedSeconds = state.gameStartTime
+      ? Math.round((Date.now() - state.gameStartTime.getTime()) / 1000)
+      : null;
+    const accuracy = state.cardsAttempted > 0
+      ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+
+    await state.activeDocRef.update({
+      status: won ? 'won' : 'lost',
+      score: state.score,
+      bestStreak: state.bestStreak,
+      accuracy,
+      cardsAttempted: state.cardsAttempted,
+      elapsedSeconds,
+      playedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn('BidTrivia: could not update game document —', err.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
    LEADERBOARD — FIRESTORE SUBMIT
    ═══════════════════════════════════════════════════ */
 async function handleSubmitScore() {
@@ -762,29 +822,6 @@ async function handleSubmitScore() {
     return;
   }
 
-  // Compute elapsed seconds
-  const elapsedSeconds = state.gameStartTime
-    ? Math.round((Date.now() - state.gameStartTime.getTime()) / 1000)
-    : null;
-
-  const accuracy = state.cardsAttempted > 0
-    ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
-
-  // Document ID = ISO timestamp of game start
-  const docId = state.gameStartTime
-    ? state.gameStartTime.toISOString()
-    : new Date().toISOString();
-
-  const payload = {
-    name,
-    score: state.score,
-    bestStreak: state.bestStreak,
-    accuracy,
-    cardsAttempted: state.cardsAttempted,
-    elapsedSeconds,
-    playedAt: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-
   // Disable UI during submit
   submitBtn.disabled = true;
   nameInput.disabled = true;
@@ -792,7 +829,32 @@ async function handleSubmitScore() {
   statusEl.className = 'submit-status saving';
 
   try {
-    await db.collection('bidtrivia_leaderboard').doc(docId).set(payload);
+    // The game document was already created at game start and updated at game end.
+    // Here we only need to patch the player's name onto the existing document.
+    if (state.activeDocRef) {
+      await state.activeDocRef.update({ name });
+    } else {
+      // Fallback: activeDocRef missing (e.g. Firebase was unavailable at start).
+      // Create the full document now so the submission isn't lost.
+      const accuracy = state.cardsAttempted > 0
+        ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+      const elapsedSeconds = state.gameStartTime
+        ? Math.round((Date.now() - state.gameStartTime.getTime()) / 1000)
+        : null;
+      const docId = state.gameStartTime
+        ? state.gameStartTime.toISOString()
+        : new Date().toISOString();
+      await db.collection('bidtrivia_leaderboard').doc(docId).set({
+        name,
+        status: 'submitted',
+        score: state.score,
+        bestStreak: state.bestStreak,
+        accuracy,
+        cardsAttempted: state.cardsAttempted,
+        elapsedSeconds,
+        playedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
     state.scoreSubmitted = true;
     statusEl.textContent = '✅ Score saved! See if you made the top 10.';
     statusEl.className = 'submit-status success';
