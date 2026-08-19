@@ -21,6 +21,12 @@ service cloud.firestore {
       allow update: if true;
     }
 
+    // ProfGuess uses the same public, three-step lifecycle: create at game
+    // start, complete at game end, then optionally attach a player name.
+    match /profguess/{docId} {
+      allow read, create, update: if true;
+    }
+
     // ── Default: deny everything else ────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
