@@ -179,6 +179,82 @@ body {
 }
 .btn-start:active { transform: translateY(0); }
 
+/* ── Mode picker: daily vs. free play ── */
+.mode-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 340px;
+}
+.mode-picker .btn-start {
+  align-self: stretch;
+  justify-content: space-between;
+  text-align: left;
+  padding: 0.75rem 1.1rem;
+}
+.mode-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.25;
+}
+.mode-btn-main { font-size: 0.95rem; font-weight: 700; }
+.mode-btn-sub {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.78;
+  letter-spacing: 0.1px;
+}
+
+/* Free play is the secondary action — outlined rather than solid */
+.btn-start--free {
+  background: transparent;
+  color: var(--purple);
+  border: 1.5px solid var(--card-border);
+}
+.btn-start--free:hover {
+  background: var(--bg-2);
+  color: var(--purple-mid);
+  border-color: var(--purple-light);
+}
+
+/* "Already played today" panel, shown in place of the daily button */
+.daily-done {
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  padding: 0.75rem 1rem;
+}
+.daily-done-head {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 0.4rem;
+}
+.daily-done-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.daily-done-stats strong { color: var(--purple); font-weight: 800; }
+.daily-done-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--card-border);
+}
+.daily-next { font-size: 0.72rem; color: var(--text-3); }
+.btn-share--sm {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+}
+
 /* Personal best banner (start screen) */
 .personal-best-banner {
   width: 100%;
@@ -989,6 +1065,11 @@ body {
   box-shadow: 0 1px 6px rgba(0,0,0,0.08);
 }
 .lb-tab:not(.active):hover { color: var(--text-1); }
+/* Three tabs are tight on small screens — let them shrink before overflowing */
+@media (max-width: 420px) {
+  .lb-tabs { width: 100%; }
+  .lb-tab { flex: 1; padding: 0.4rem 0.5rem; font-size: 0.76rem; }
+}
 
 /* Leaderboard list */
 .lb-list {

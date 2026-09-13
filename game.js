@@ -35,6 +35,14 @@ const CONFIG = {
   DEDUPLICATE_BY_NAME: false,
 
   LB_TOP_N: 10,   // number of entries to show per period
+
+  // ── Daily puzzle settings ─────────────────────────────────────────────────
+  // Everyone who visits on the same calendar day (in DAILY_TZ) gets the exact
+  // same deck, in the same order, derived by seeding the shuffle with the date.
+  // The deck is a function of the date AND data/kellogg_bid_stats.js — don't
+  // regenerate the data file mid-day or the puzzle changes underneath players.
+  DAILY_TZ: 'America/Chicago',
+  DAILY_EPOCH: '2026-09-12',   // puzzle #1 — the day the daily launched
 };
 
 /* ═══════════════════════════════════════════════════
@@ -42,6 +50,7 @@ const CONFIG = {
    ═══════════════════════════════════════════════════ */
 const LS_ALLTIME_BEST = 'bidtrivia_alltime_best_streak';
 const LS_LAST_STREAK = 'bidtrivia_last_streak';
+const LS_DAILY_PREFIX = 'bidtrivia_daily_';   // + YYYY-MM-DD → today's result
 
 /* ═══════════════════════════════════════════════════
    SAMPLE DATA  (fallback when CSV can't be loaded)
@@ -131,6 +140,12 @@ let state = {
   isAnimating: false,
   dragging: false,
   clickMode: false, // true = card is "picked up", waiting for slot click
+
+  // Mode: 'free' (random deck, week/month boards) or 'daily' (seeded deck,
+  // same for everyone that day, its own board).
+  mode: 'free',
+  puzzleDate: null,    // 'YYYY-MM-DD' in CONFIG.DAILY_TZ — daily mode only
+  puzzleNumber: null,  // sequential #, daily mode only
 
   // Leaderboard / session tracking
   gameStartTime: null,  // Date object set when game starts
@@ -326,6 +341,110 @@ async function loadData() {
 }
 
 /* ═══════════════════════════════════════════════════
+   DAILY PUZZLE
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * Today's puzzle date as YYYY-MM-DD, always in CONFIG.DAILY_TZ.
+ * The fixed timezone is the whole point: if we used the visitor's local clock,
+ * players in different zones would be on different puzzles at the same moment.
+ */
+function getPuzzleDate(d = new Date()) {
+  try {
+    // 'en-CA' formats as YYYY-MM-DD, which is exactly the key we want.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: CONFIG.DAILY_TZ,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d);
+  } catch (_) {
+    // Intl or the tz database is unavailable — fall back to local date.
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+}
+
+/** Sequential puzzle number since DAILY_EPOCH — "BidTrivia #47". */
+function getPuzzleNumber(puzzleDate = getPuzzleDate()) {
+  const toUTC = s => {
+    const [y, m, d] = s.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const days = Math.round((toUTC(puzzleDate) - toUTC(CONFIG.DAILY_EPOCH)) / 86400000);
+  return days + 1;
+}
+
+/** Deterministic 32-bit seed from an arbitrary string (FNV-1a). */
+function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32 — small, fast, well-distributed seeded PRNG. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Same Fisher-Yates as shuffle(), but driven by a supplied RNG. */
+function seededShuffle(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ── Daily completion record (localStorage) ── */
+
+function dailyKey(puzzleDate) {
+  return LS_DAILY_PREFIX + puzzleDate;
+}
+
+/** Today's stored result, or null if they haven't finished today's puzzle. */
+function getDailyResult(puzzleDate = getPuzzleDate()) {
+  try {
+    const raw = localStorage.getItem(dailyKey(puzzleDate));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveDailyResult(puzzleDate, result) {
+  try {
+    localStorage.setItem(dailyKey(puzzleDate), JSON.stringify(result));
+  } catch (_) { /* storage full or blocked — the lock just won't stick */ }
+}
+
+/** Drop daily records older than 30 days so localStorage doesn't grow forever. */
+function pruneDailyResults() {
+  try {
+    const cutoff = Date.now() - 30 * 86400000;
+    const stale = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(LS_DAILY_PREFIX)) continue;
+      const datePart = key.slice(LS_DAILY_PREFIX.length);
+      const [y, m, d] = datePart.split('-').map(Number);
+      if (!y || !m || !d) continue;
+      if (Date.UTC(y, m - 1, d) < cutoff) stale.push(key);
+    }
+    stale.forEach(k => localStorage.removeItem(k));
+  } catch (_) { /* non-critical */ }
+}
+
+/* ═══════════════════════════════════════════════════
    GAME LOGIC
    ═══════════════════════════════════════════════════ */
 function shuffle(arr) {
@@ -337,12 +456,19 @@ function shuffle(arr) {
   return a;
 }
 
-function buildDeck() {
-  const shuffled = shuffle(state.allData);
+/**
+ * Build this game's deck. In 'daily' mode the shuffle is seeded with the
+ * puzzle date, so every player on that date gets the identical deck in the
+ * identical order. In 'free' mode it's a plain random shuffle.
+ */
+function buildDeck(mode = 'free', puzzleDate = null) {
+  const shuffled = mode === 'daily'
+    ? seededShuffle(state.allData, mulberry32(hashSeed('bidtrivia-' + puzzleDate)))
+    : shuffle(state.allData);
   return shuffled.slice(0, Math.min(CONFIG.CARDS_PER_GAME, shuffled.length));
 }
 
-async function startGame() {
+async function startGame(mode = 'free') {
   // Show/hide screens
   document.getElementById('start-screen').classList.remove('active');
   document.getElementById('gameover-screen') && document.getElementById('gameover-screen').classList.remove('active');
@@ -354,7 +480,11 @@ async function startGame() {
   }
 
   // Reset state
-  const deck = buildDeck();
+  state.mode = mode === 'daily' ? 'daily' : 'free';
+  state.puzzleDate = state.mode === 'daily' ? getPuzzleDate() : null;
+  state.puzzleNumber = state.mode === 'daily' ? getPuzzleNumber(state.puzzleDate) : null;
+
+  const deck = buildDeck(state.mode, state.puzzleDate);
   state.deck = deck.slice(1); // remaining cards
   state.timeline = [deck[0]];     // anchor — first card placed automatically
   state.cardIndex = 0;
@@ -382,6 +512,7 @@ function goHome() {
   document.getElementById('game-screen').classList.remove('active');
   document.getElementById('start-screen').classList.add('active');
   updatePersonalBestBanner();
+  updateDailyPanel();
   fetchStartScreenLeaderboard();
 }
 
@@ -641,11 +772,29 @@ function showResults(won = false) {
   updateGameDocument(won);
 
   // ── Header ──────────────────────────────────────
+  const isDaily = state.mode === 'daily';
   document.getElementById('results-emoji').textContent = won ? '🏆' : '💀';
-  document.getElementById('results-title').textContent = won ? 'Deck Complete!' : 'Game Over';
+  document.getElementById('results-title').textContent = isDaily
+    ? `Daily #${state.puzzleNumber} — ${won ? 'Cleared!' : 'Game Over'}`
+    : (won ? 'Deck Complete!' : 'Game Over');
   document.getElementById('results-sub').textContent = won
     ? `You placed all ${state.score} cards correctly!`
     : `You placed ${state.score} out of ${state.cardsAttempted - 1} correctly.`;
+
+  // ── Daily lock: record today's result so the puzzle can't be replayed ──
+  if (isDaily) {
+    const acc = state.cardsAttempted > 0
+      ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
+    saveDailyResult(state.puzzleDate, {
+      puzzleNumber: state.puzzleNumber,
+      score: state.score,
+      bestStreak: state.bestStreak,
+      accuracy: acc,
+      cardsAttempted: state.cardsAttempted,
+      won,
+      completedAt: new Date().toISOString(),
+    });
+  }
 
   // ── Score stats ─────────────────────────────────
   document.getElementById('final-score').textContent = state.score;
@@ -689,44 +838,74 @@ function showResults(won = false) {
     shareBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Share Result`;
   }
 
+  // After a daily, "Play Again" can only mean free play — the daily is spent.
+  const playAgainLabel = document.getElementById('play-again-label');
+  if (playAgainLabel) {
+    playAgainLabel.textContent = isDaily ? 'Free Play' : 'Play Again';
+  }
+
   // ── Leaderboard ──────────────────────────────────
-  state.activeLbPeriod = 'week';
-  setActiveTab('week');
-  fetchLeaderboard('week');
+  // A daily game lands on the "Today" board; free play on the weekly.
+  const startPeriod = isDaily ? 'today' : 'week';
+  state.activeLbPeriod = startPeriod;
+  setActiveTab(startPeriod);
+  fetchLeaderboard(startPeriod);
 }
 
 /* ═══════════════════════════════════════════════════
    SHARE RESULT
    ═══════════════════════════════════════════════════ */
+/**
+ * Build the shareable summary. Pass puzzleNumber for a daily result, null for
+ * free play — the puzzle number is what lets people compare in a group chat.
+ */
+function buildShareText(r) {
+  const lines = [
+    r.puzzleNumber ? `📚 BidTrivia Daily #${r.puzzleNumber}` : `📚 BidTrivia`,
+    ``,
+    `Score: ${r.score}/${r.cardsAttempted} · Streak: ${r.bestStreak} · Accuracy: ${r.accuracy}%`,
+    ``,
+    r.puzzleNumber
+      ? `Same 15 cards for everyone today — how'd you do?`
+      : `Think you know the Kellogg bid market better?`,
+    `kelloggbidpoints.com`,
+  ];
+  return lines.join('\n');
+}
+
+/** Native share on mobile, clipboard everywhere else. */
+async function shareText(text, btn) {
+  if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+    try {
+      await navigator.share({ text });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;   // user cancelled — don't also copy
+    }
+  }
+  await copyToClipboard(text, btn);
+}
+
+/** Re-share today's stored daily result from the start screen. */
+async function shareStoredDaily() {
+  const r = getDailyResult();
+  if (!r) return;
+  await shareText(buildShareText(r), document.getElementById('daily-share-btn'));
+}
+
 async function handleShareResult() {
   const accuracy = state.cardsAttempted > 0
     ? Math.round((state.score / state.cardsAttempted) * 100) : 0;
 
-  const lines = [
-    `📚 BidTrivia`,
-    ``,
-    `Score: ${state.score}/${state.cardsAttempted} · Streak: ${state.bestStreak} · Accuracy: ${accuracy}%`,
-    ``,
-    `Think you know the Kellogg bid market better?`,
-    `kelloggbidpoints.com`,
-  ];
-  const shareText = lines.join('\n');
+  const text = buildShareText({
+    puzzleNumber: state.mode === 'daily' ? state.puzzleNumber : null,
+    score: state.score,
+    cardsAttempted: state.cardsAttempted,
+    bestStreak: state.bestStreak,
+    accuracy,
+  });
 
-  const shareBtn = document.getElementById('share-btn');
-
-  // Try native share on mobile, clipboard on desktop
-  if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
-    try {
-      await navigator.share({ text: shareText });
-    } catch (e) {
-      // User cancelled or share failed — fall through to clipboard
-      if (e.name !== 'AbortError') {
-        await copyToClipboard(shareText, shareBtn);
-      }
-    }
-  } else {
-    await copyToClipboard(shareText, shareBtn);
-  }
+  await shareText(text, document.getElementById('share-btn'));
 }
 
 async function copyToClipboard(text, btn) {
@@ -743,13 +922,15 @@ async function copyToClipboard(text, btn) {
     document.body.removeChild(ta);
   }
 
-  // Visual feedback
+  // Visual feedback — restore whatever label the button started with, so this
+  // works for both the results "Share Result" button and the start-screen one.
   if (btn) {
+    const original = btn.innerHTML;
     btn.classList.add('copied');
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
     setTimeout(() => {
       btn.classList.remove('copied');
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Share Result`;
+      btn.innerHTML = original;
     }, 2500);
   }
 
@@ -770,6 +951,53 @@ function updatePersonalBestBanner() {
   banner.style.display = '';
   document.getElementById('pb-last-streak').textContent = lastStreak || '—';
   document.getElementById('pb-alltime-streak').textContent = alltimeBest || '—';
+}
+
+/* ═══════════════════════════════════════════════════
+   START SCREEN — DAILY PANEL
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * Swap the daily button between "play" and "already played today" states.
+ * The lock is localStorage-only (same as Wordle) — clearing storage or using a
+ * private window gets around it. That's an accepted trade for not needing
+ * accounts; the daily board deduplicates by name to blunt the rest.
+ */
+function updateDailyPanel() {
+  const btn = document.getElementById('daily-btn');
+  const done = document.getElementById('daily-done');
+  if (!btn || !done) return;
+
+  const puzzleDate = getPuzzleDate();
+  const num = getPuzzleNumber(puzzleDate);
+  const result = getDailyResult(puzzleDate);
+
+  const subEl = document.getElementById('daily-sub');
+  if (subEl) subEl.textContent = `#${num} · same cards for everyone`;
+
+  if (!result) {
+    btn.style.display = '';
+    done.style.display = 'none';
+    return;
+  }
+
+  btn.style.display = 'none';
+  done.style.display = '';
+  document.getElementById('daily-done-num').textContent = `#${result.puzzleNumber ?? num}`;
+  document.getElementById('daily-done-stats').innerHTML = `
+    <span><strong>${result.score}</strong>/${result.cardsAttempted} correct</span>
+    <span>🔥 ${result.bestStreak}</span>
+    <span>${result.accuracy}%</span>`;
+}
+
+/** Entry point for the daily button — refuses a second run on the same day. */
+function startDaily() {
+  if (getDailyResult()) {
+    showToast('You already played today — new puzzle at midnight CT.', 'info');
+    updateDailyPanel();
+    return;
+  }
+  startGame('daily');
 }
 
 /* ═══════════════════════════════════════════════════
@@ -796,6 +1024,8 @@ async function createGameDocument() {
       score: null,
       startedAt: firebase.firestore.FieldValue.serverTimestamp(),
       status: 'in_progress',
+      mode: state.mode,
+      puzzleDate: state.puzzleDate,   // null for free play
     });
     state.activeDocRef = ref;
   } catch (err) {
@@ -886,6 +1116,8 @@ async function handleSubmitScore() {
         score: state.score,
         startedAt: null,
         status: 'submitted',
+        mode: state.mode,
+        puzzleDate: state.puzzleDate,
       });
     }
     state.scoreSubmitted = true;
@@ -935,22 +1167,42 @@ async function fetchLeaderboard(period, listElId = 'lb-list') {
   }
 
   try {
-    const periodStart = getPeriodStart(period);
+    let query;
+    if (period === 'today') {
+      // Daily board: every game played on today's puzzle. Equality-only filter,
+      // so Firestore's automatic single-field index covers it — no composite
+      // index needed. Sorting happens client-side below.
+      query = db.collection('bidtrivia_leaderboard')
+        .where('puzzleDate', '==', getPuzzleDate());
+    } else {
+      const periodStart = getPeriodStart(period);
+      // We need to order by score desc — Firestore requires the inequality field
+      // first, so we fetch the period and sort client-side.
+      query = db.collection('bidtrivia_leaderboard')
+        .where('endedAt', '>=', periodStart)
+        .orderBy('endedAt', 'asc');
+    }
 
-    let query = db.collection('bidtrivia_leaderboard')
-      .where('endedAt', '>=', periodStart)
-      .orderBy('endedAt', 'asc'); // secondary: recency (endedAt asc = needed for compound index)
-
-    // We need to order by score desc — Firestore requires the inequality field first,
-    // so we fetch a larger set, sort client-side, and slice top N.
     const snapshot = await query.get();
 
     let entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+    // Drop unfinished games and games where the player never submitted a name.
+    entries = entries.filter(e => e.score != null && e.name && e.name.trim());
+
+    // Daily results are kept off the weekly/monthly boards: those reward volume
+    // of free play, the daily rewards one fair shot at a shared deck.
+    // Legacy documents predate the `mode` field — treat those as free play.
+    if (period !== 'today') {
+      entries = entries.filter(e => e.mode !== 'daily');
+    }
+
     // ── Deduplication scaffolding ─────────────────────────────────────────────
     // When CONFIG.DEDUPLICATE_BY_NAME is true, keep only each player's best game.
     // Currently false (show all entries independently).
-    if (CONFIG.DEDUPLICATE_BY_NAME) {
+    // The daily board is always deduplicated: one shared puzzle means one row
+    // per player, whatever the free-play setting is.
+    if (CONFIG.DEDUPLICATE_BY_NAME || period === 'today') {
       const bestByName = new Map();
       entries.forEach(entry => {
         const key = entry.name.toLowerCase().trim();
@@ -983,7 +1235,8 @@ function renderLeaderboard(entries, period, listElId = 'lb-list') {
   if (!listEl) return;
 
   if (entries.length === 0) {
-    const periodLabel = period === 'week' ? 'this week' : 'this month';
+    const periodLabel = period === 'today' ? "on today's puzzle"
+      : period === 'week' ? 'this week' : 'this month';
     listEl.innerHTML = `<p class="lb-empty">No scores ${periodLabel} yet — be the first! 🎯</p>`;
     return;
   }
@@ -1017,23 +1270,29 @@ function switchLeaderboardTab(period) {
   fetchLeaderboard(period, 'lb-list');
 }
 
+const LB_PERIODS = ['today', 'week', 'month'];
+
+/** Highlight the selected tab in a strip ('lb-tab-' or 'start-lb-tab-'). */
+function setActiveTabIn(prefix, period) {
+  LB_PERIODS.forEach(p => {
+    const el = document.getElementById(prefix + p);
+    if (!el) return;
+    el.classList.toggle('active', p === period);
+    el.setAttribute('aria-selected', p === period);
+  });
+}
+
 function setActiveTab(period) {
-  document.getElementById('lb-tab-week').classList.toggle('active', period === 'week');
-  document.getElementById('lb-tab-month').classList.toggle('active', period === 'month');
-  document.getElementById('lb-tab-week').setAttribute('aria-selected', period === 'week');
-  document.getElementById('lb-tab-month').setAttribute('aria-selected', period === 'month');
+  setActiveTabIn('lb-tab-', period);
 }
 
 /* ── Start-screen leaderboard tabs ── */
-let startLbPeriod = 'week';
+let startLbPeriod = 'today';
 
 function switchStartLeaderboardTab(period) {
   if (period === startLbPeriod) return;
   startLbPeriod = period;
-  document.getElementById('start-lb-tab-week').classList.toggle('active', period === 'week');
-  document.getElementById('start-lb-tab-month').classList.toggle('active', period === 'month');
-  document.getElementById('start-lb-tab-week').setAttribute('aria-selected', period === 'week');
-  document.getElementById('start-lb-tab-month').setAttribute('aria-selected', period === 'month');
+  setActiveTabIn('start-lb-tab-', period);
   fetchLeaderboard(period, 'start-lb-list');
 }
 
@@ -1072,8 +1331,9 @@ function renderStats() {
 function renderProgress() {
   const total = state.deck.length;
   const current = state.cardIndex + 1;
+  const prefix = state.mode === 'daily' ? `Daily #${state.puzzleNumber} · ` : '';
   document.getElementById('progress-text').textContent =
-    `Card ${Math.min(current, total)} of ${total}`;
+    `${prefix}Card ${Math.min(current, total)} of ${total}`;
 }
 
 function renderActiveCard() {
@@ -1315,6 +1575,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFirebase();
   await loadData();
   initDragDrop();
+  pruneDailyResults();
   updatePersonalBestBanner();
+  updateDailyPanel();
+  setActiveTabIn('start-lb-tab-', startLbPeriod);
   fetchStartScreenLeaderboard();
 });

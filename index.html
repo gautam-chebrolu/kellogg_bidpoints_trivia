@@ -48,10 +48,41 @@
             </div>
           </div>
 
-          <button id="start-btn" class="btn-start" onclick="startGame()">
-            Start Game
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-          </button>
+          <!-- Mode picker: shared daily puzzle vs. endless free play -->
+          <div class="mode-picker">
+
+            <button id="daily-btn" class="btn-start btn-start--daily" onclick="startDaily()">
+              <span class="mode-btn-text">
+                <span class="mode-btn-main">Play Today's Puzzle</span>
+                <span id="daily-sub" class="mode-btn-sub">Same cards for everyone</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+            </button>
+
+            <!-- Shown instead of the button once today's puzzle is finished -->
+            <div id="daily-done" class="daily-done" style="display:none;">
+              <div class="daily-done-head">
+                ✅ Daily <span id="daily-done-num"></span> complete
+              </div>
+              <div id="daily-done-stats" class="daily-done-stats"></div>
+              <div class="daily-done-foot">
+                <button id="daily-share-btn" class="btn-share btn-share--sm" onclick="shareStoredDaily()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                  Share
+                </button>
+                <span class="daily-next">New puzzle at midnight CT</span>
+              </div>
+            </div>
+
+            <button id="start-btn" class="btn-start btn-start--free" onclick="startGame('free')">
+              <span class="mode-btn-text">
+                <span class="mode-btn-main">Free Play</span>
+                <span class="mode-btn-sub">Random deck · counts toward week &amp; month</span>
+              </span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+            </button>
+
+          </div>
         </div>
 
         <!-- Right column: leaderboard -->
@@ -61,7 +92,8 @@
               <h2 class="lb-title">Leaderboard</h2>
             </div>
             <div class="lb-tabs" role="tablist">
-              <button id="start-lb-tab-week" class="lb-tab active" role="tab" aria-selected="true" onclick="switchStartLeaderboardTab('week')">This Week</button>
+              <button id="start-lb-tab-today" class="lb-tab active" role="tab" aria-selected="true" onclick="switchStartLeaderboardTab('today')">Today</button>
+              <button id="start-lb-tab-week" class="lb-tab" role="tab" aria-selected="false" onclick="switchStartLeaderboardTab('week')">This Week</button>
               <button id="start-lb-tab-month" class="lb-tab" role="tab" aria-selected="false" onclick="switchStartLeaderboardTab('month')">This Month</button>
             </div>
             <div id="start-lb-list" class="lb-list">
@@ -209,9 +241,9 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             Share Result
           </button>
-          <button class="btn-primary" onclick="startGame()">
+          <button class="btn-primary" onclick="startGame('free')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-            Play Again
+            <span id="play-again-label">Play Again</span>
           </button>
           <button class="btn-secondary" onclick="goHome()">Home</button>
         </div>
@@ -242,6 +274,7 @@
               <h2 class="lb-title">Leaderboard</h2>
             </div>
             <div class="lb-tabs" role="tablist">
+              <button id="lb-tab-today" class="lb-tab" role="tab" aria-selected="false" onclick="switchLeaderboardTab('today')">Today</button>
               <button id="lb-tab-week" class="lb-tab active" role="tab" aria-selected="true" onclick="switchLeaderboardTab('week')">This Week</button>
               <button id="lb-tab-month" class="lb-tab" role="tab" aria-selected="false" onclick="switchLeaderboardTab('month')">This Month</button>
             </div>
