@@ -22,31 +22,8 @@
 
       <div class="start-body">
 
-        <!-- Left column: rules + play -->
+        <!-- Left column: play buttons -->
         <div class="start-left">
-          <div class="how-to-play">
-            <h2>How to Play</h2>
-            <ol class="steps-flat">
-              <li>You see a course card with all details — except the <strong>closing cost</strong>.</li>
-              <li>Place it on the <strong>cost timeline</strong> relative to already-placed cards.</li>
-              <li>Keep your streak alive — <strong>three misses</strong> and it's game over.</li>
-            </ol>
-          </div>
-
-          <!-- Personal Best Badge (shown only if localStorage has data) -->
-          <div id="personal-best-banner" class="personal-best-banner" style="display:none;">
-            <div class="pb-row">
-              <div class="pb-stat">
-                <span class="pb-label">Last Streak</span>
-                <span id="pb-last-streak" class="pb-value">—</span>
-              </div>
-              <div class="pb-divider"></div>
-              <div class="pb-stat">
-                <span class="pb-label">All-Time Best</span>
-                <span id="pb-alltime-streak" class="pb-value">—</span>
-              </div>
-            </div>
-          </div>
 
           <!-- Mode picker: shared daily puzzle vs. endless free play -->
           <div class="mode-picker">
@@ -83,6 +60,21 @@
             </button>
 
           </div>
+
+          <!-- Personal Best Badge (shown only if localStorage has data) -->
+          <div id="personal-best-banner" class="personal-best-banner" style="display:none;">
+            <div class="pb-row">
+              <div class="pb-stat">
+                <span class="pb-label">Last Streak</span>
+                <span id="pb-last-streak" class="pb-value">—</span>
+              </div>
+              <div class="pb-divider"></div>
+              <div class="pb-stat">
+                <span class="pb-label">All-Time Best</span>
+                <span id="pb-alltime-streak" class="pb-value">—</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Right column: leaderboard -->
@@ -106,6 +98,17 @@
         </div>
 
       </div>
+
+      <!-- How to play — centered beneath the two columns -->
+      <div class="how-to-play">
+        <h2>How to Play</h2>
+        <ol class="steps-flat">
+          <li>You see a course card with all details — except the <strong>closing cost</strong>.</li>
+          <li>Place it on the <strong>cost timeline</strong> relative to already-placed cards.</li>
+          <li>Keep your streak alive — <strong>three misses</strong> and it's game over.</li>
+        </ol>
+      </div>
+
     </div>
   </div>
 
