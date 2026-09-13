@@ -1,1 +1,3 @@
 # Firebase credentials — never commit the real config
+firebase-config.js
+service-account-key.json

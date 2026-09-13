@@ -51,6 +51,7 @@ const CONFIG = {
 const LS_ALLTIME_BEST = 'bidtrivia_alltime_best_streak';
 const LS_LAST_STREAK = 'bidtrivia_last_streak';
 const LS_DAILY_PREFIX = 'bidtrivia_daily_';   // + YYYY-MM-DD → today's result
+const DAILIES_COLLECTION = 'bidtrivia_dailies';
 
 /* ═══════════════════════════════════════════════════
    SAMPLE DATA  (fallback when CSV can't be loaded)
@@ -457,14 +458,33 @@ function shuffle(arr) {
 }
 
 /**
- * Build this game's deck. In 'daily' mode the shuffle is seeded with the
- * puzzle date, so every player on that date gets the identical deck in the
- * identical order. In 'free' mode it's a plain random shuffle.
+ * Build this game's deck. In 'daily' mode, we first check Firestore for a
+ * seed override; if unavailable we fall back to the deterministic formula.
+ * In 'free' mode it's a plain random shuffle.
  */
-function buildDeck(mode = 'free', puzzleDate = null) {
-  const shuffled = mode === 'daily'
-    ? seededShuffle(state.allData, mulberry32(hashSeed('bidtrivia-' + puzzleDate)))
-    : shuffle(state.allData);
+async function buildDeck(mode = 'free', puzzleDate = null) {
+  if (mode !== 'daily') {
+    return shuffle(state.allData)
+      .slice(0, Math.min(CONFIG.CARDS_PER_GAME, state.allData.length));
+  }
+
+  // Daily mode — try Firestore override first, then deterministic fallback.
+  let seed = hashSeed('bidtrivia-' + puzzleDate);
+  if (db) {
+    try {
+      const doc = await db.collection(DAILIES_COLLECTION).doc(puzzleDate).get();
+      if (doc.exists) {
+        const data = doc.data();
+        if (data && typeof data.seed === 'number') {
+          seed = data.seed >>> 0;  // ensure uint32
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch daily override —', err.message);
+    }
+  }
+
+  const shuffled = seededShuffle(state.allData, mulberry32(seed));
   return shuffled.slice(0, Math.min(CONFIG.CARDS_PER_GAME, shuffled.length));
 }
 
@@ -484,7 +504,7 @@ async function startGame(mode = 'free') {
   state.puzzleDate = state.mode === 'daily' ? getPuzzleDate() : null;
   state.puzzleNumber = state.mode === 'daily' ? getPuzzleNumber(state.puzzleDate) : null;
 
-  const deck = buildDeck(state.mode, state.puzzleDate);
+  const deck = await buildDeck(state.mode, state.puzzleDate);
   state.deck = deck.slice(1); // remaining cards
   state.timeline = [deck[0]];     // anchor — first card placed automatically
   state.cardIndex = 0;

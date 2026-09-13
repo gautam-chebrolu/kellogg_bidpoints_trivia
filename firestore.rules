@@ -44,6 +44,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Daily puzzle overrides — seeded by the host, read-only for clients.
+    match /bidtrivia_dailies/{dateId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
     // ── ProfGuess ────────────────────────────────────────────────────────
     // Tournament sessions, keyed by team code.
     match /profguess/{teamCode} {
@@ -56,6 +62,12 @@ service cloud.firestore {
     match /profguess_leaderboard/{docId} {
       allow read, create, update: if true;
       allow delete: if false;
+    }
+
+    // Daily puzzle overrides — seeded by the host, read-only for clients.
+    match /profguess_dailies/{dateId} {
+      allow read: if true;
+      allow create, update, delete: if false;
     }
 
     // ── GeoGuessr ────────────────────────────────────────────────────────
